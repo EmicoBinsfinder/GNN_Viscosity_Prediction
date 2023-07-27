@@ -17,6 +17,30 @@ import torch
 from torch_geometric.data import Data
 from torch.utils.data import DataLoader
 import pandas as pd
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+import matplotlib.pyplot as plt
+from IPython.display import set_matplotlib_formats
+from matplotlib.colors import to_rgb
+import matplotlib
+import seaborn as sns
+from tqdm.notebook import tqdm
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.data as data
+import torch.optim as optim
+import torchvision
+from torchvision.datasets import CIFAR10
+from torchvision import transforms
+import torch_geometric.nn as geom_nn
+import torch_geometric.data as geom_data
+import os
+import math
+import json
+
+CHECKPOINT_PATH = 'C:/Users/eeo21/Desktop/VS Code Files/GNN_Viscosity_Prediction/SavedModel'
+device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
 
 ###################### PREPARE DATASET ##############################
 
@@ -170,9 +194,69 @@ Y_labels = Dataset['VI'].tolist
 print(Smiles_list)
 print(Y_labels)
 
+data_list = create_pytorch_geometric_graph_data_list_from_smiles_and_labels(Smiles_list, Y_labels)
+
 ################## DEFINE MODEL ARCHITECTURE ######################
 
-##### DEFINING THE GRAPH NETWORK
+## Defining different GNN layers from the Torch Geometric library for use later on 
+
+gnn_layer_by_name = {
+    "GCN": geom_nn.GCNConv,
+    "GAT": geom_nn.GATConv,
+    "GraphConv": geom_nn.GraphConv
+}
+
+####### Defining a Graph GNN Class
+
+class GNNModel(nn.Module):
+
+    def __init__(self, c_in, c_hidden, c_out, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs):
+        """
+        Inputs:
+            c_in - Dimension of input features
+            c_hidden - Dimension of hidden features
+            c_out - Dimension of the output features. Usually number of classes in classification
+            num_layers - Number of "hidden" graph layers
+            layer_name - String of the graph layer to use
+            dp_rate - Dropout rate to apply throughout the network
+            kwargs - Additional arguments for the graph layer (e.g. number of heads for GAT)
+        """
+        super().__init__()
+        gnn_layer = gnn_layer_by_name[layer_name]
+
+        layers = []
+        in_channels, out_channels = c_in, c_hidden
+        for l_idx in range(num_layers-1):
+            layers += [
+                gnn_layer(in_channels=in_channels,
+                          out_channels=out_channels,
+                          **kwargs),
+                nn.ReLU(inplace=True),
+                nn.Dropout(dp_rate)
+            ]
+            in_channels = c_hidden
+        layers += [gnn_layer(in_channels=in_channels,
+                             out_channels=c_out,
+                             **kwargs)]
+        self.layers = nn.ModuleList(layers)
+
+    def forward(self, x, edge_index):
+        """
+        Inputs:
+            x - Input features per node
+            edge_index - List of vertex index pairs representing the edges in the graph (PyTorch geometric notation)
+        """
+        for l in self.layers:
+            # For graph layers, we need to add the "edge_index" tensor as additional input
+            # All PyTorch Geometric graph layer inherit the class "MessagePassing", hence
+            # we can simply check the class type.
+            if isinstance(l, geom_nn.MessagePassing):
+                x = l(x, edge_index)
+            else:
+                x = l(x)
+        return x
+
+##### DEFINING THE GRAPH Level GNN
 
 class GraphGNNModel(torch.nn.Module):
 
@@ -216,9 +300,14 @@ class GraphLevelGNN(pl.LightningModule):
         # Saving hyperparameters
         self.save_hyperparameters()
 
+        # Defining the model with **model_kwargs arguments defining the architecture
         self.model = GraphGNNModel(**model_kwargs)
-        self.loss_module = nn.BCEWithLogitsLoss() if self.hparams.c_out == 1 else nn.CrossEntropyLoss()
 
+        # Defining the Loss Function 
+        self.loss_module = nn.MSELoss()
+
+    
+    # Defining the forward pass 
     def forward(self, data, mode="train"):
         x, edge_index, batch_idx = data.x, data.edge_index, data.batch
         x = self.model(x, edge_index, batch_idx)
@@ -232,11 +321,13 @@ class GraphLevelGNN(pl.LightningModule):
         loss = self.loss_module(x, data.y)
         acc = (preds == data.y).sum().float() / preds.shape[0]
         return loss, acc
-
+    
+    # Configuring the Loss Function 
     def configure_optimizers(self):
         optimizer = optim.AdamW(self.parameters(), lr=1e-2, weight_decay=0.0) # High lr because of small dataset and small model
         return optimizer
-
+    
+    # Returning the loss scores
     def training_step(self, batch, batch_idx):
         loss, acc = self.forward(batch, mode="train")
         self.log('train_loss', loss)
@@ -253,7 +344,7 @@ class GraphLevelGNN(pl.LightningModule):
 
 ################## DEFINE TRAINING LOOP ###############################
 
-def train_graph_classifier(model_name, **model_kwargs):
+def train_graph_model(model_name, **model_kwargs):
     pl.seed_everything(42)
 
     # Create a PyTorch Lightning trainer with the generation callback
@@ -285,7 +376,7 @@ def train_graph_classifier(model_name, **model_kwargs):
     result = {"test": test_result[0]['test_acc'], "train": train_result[0]['test_acc']}
     return model, result
 
-# model, result = train_graph_classifier(model_name="GraphConv",
+# model, result = train_graph_model(model_name="GraphConv",
 #                                        c_hidden=256,
 #                                        layer_name="GraphConv",
 #                                        num_layers=3,
@@ -293,18 +384,4 @@ def train_graph_classifier(model_name, **model_kwargs):
 #                                        dp_rate=0.0)
 
 
-
-"""
-Requirements for GNN data:
-
-- Label for each node telling dataset loader exactly what graph that node belongs to, helpful for batching
-which helps with training
-- Dataset stating which node is connected to which other nodes in each graph, the edge list
-- Number of each nodes in each graph
-- The dimensionality of the feature vector of each node (e.g., a dimensionalilty of three would mean
-three different factors that represent that node and in theory contribute to the target value)
-- Labels for the output, in our case, a continuous value representing viscosity (index) 
-- We need to consider including self-messages, so sending a message about the target node to the target node
-
-"""
 
