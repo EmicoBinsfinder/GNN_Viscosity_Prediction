@@ -179,7 +179,7 @@ def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)
         
         # construct label tensor
         y_tensor = torch.tensor(np.array([y_val]), dtype = torch.float)
-        
+
         # construct Pytorch Geometric data object and append to data list
         data_list.append(Data(x = X, edge_index = E, edge_attr = EF, y = y_tensor))
     return data_list
@@ -188,15 +188,10 @@ def create_pytorch_geometric_graph_data_list_from_smiles_and_labels(x_smiles, y)
 
 Dataset = pd.read_csv('C:/Users/eeo21/Desktop/VS Code Files/GNN_Viscosity_Prediction/Dataset.csv')
 
-Smiles_list = Dataset['smiles'].tolist
-Y_labels = Dataset['VI'].tolist
+Smiles_list = Dataset['smiles'].tolist()
+Y_labels = Dataset['VI'].tolist()
 
-print(Smiles_list)
-print(Y_labels)
-
-data_list = create_pytorch_geometric_graph_data_list_from_smiles_and_labels(Smiles_list, Y_labels)
-
-tu_dataset = torch_geometric.datasets.TUDataset(root=DATASET_PATH, name="MUTAG")
+data_list = create_pytorch_geometric_graph_data_list_from_smiles_and_labels(Smiles_list[:300], Y_labels[:300])
 
 ################## DEFINE MODEL ARCHITECTURE ######################
 
@@ -208,141 +203,72 @@ gnn_layer_by_name = {
     "GraphConv": geom_nn.GraphConv
 }
 
-####### Defining a Graph GNN Class
+from torch_geometric.nn import GCNConv
+import torch.nn.functional as F
 
-class GNNModel(nn.Module):
-
-    def __init__(self, c_in, c_hidden, c_out, num_layers=2, layer_name="GCN", dp_rate=0.1, **kwargs):
-        """
-        Inputs:
-            c_in - Dimension of input features
-            c_hidden - Dimension of hidden features
-            c_out - Dimension of the output features. Usually number of classes in classification
-            num_layers - Number of "hidden" graph layers
-            layer_name - String of the graph layer to use
-            dp_rate - Dropout rate to apply throughout the network
-            kwargs - Additional arguments for the graph layer (e.g. number of heads for GAT)
-        """
+class GCN(torch.nn.Module):
+    def __init__(self, hidden_channels):
         super().__init__()
-        gnn_layer = gnn_layer_by_name[layer_name]
-
-        layers = []
-        in_channels, out_channels = c_in, c_hidden
-        for l_idx in range(num_layers-1):
-            layers += [
-                gnn_layer(in_channels=in_channels,
-                          out_channels=out_channels,
-                          **kwargs),
-                nn.ReLU(inplace=True),
-                nn.Dropout(dp_rate)
-            ]
-            in_channels = c_hidden
-        layers += [gnn_layer(in_channels=in_channels,
-                             out_channels=c_out,
-                             **kwargs)]
-        self.layers = nn.ModuleList(layers)
+        torch.manual_seed(1234567)
+        self.conv1 = GCNConv(2, hidden_channels)
+        self.conv2 = GCNConv(hidden_channels, 1)
 
     def forward(self, x, edge_index):
-        """
-        Inputs:
-            x - Input features per node
-            edge_index - List of vertex index pairs representing the edges in the graph (PyTorch geometric notation)
-        """
-        for l in self.layers:
-            # For graph layers, we need to add the "edge_index" tensor as additional input
-            # All PyTorch Geometric graph layer inherit the class "MessagePassing", hence
-            # we can simply check the class type.
-            if isinstance(l, geom_nn.MessagePassing):
-                x = l(x, edge_index)
-            else:
-                x = l(x)
+        x = self.conv1(x, edge_index)
+        x = x.relu()
+        x = F.dropout(x, p=0.5, training=self.training)
+        x = self.conv2(x, edge_index)
         return x
 
-##### DEFINING THE GRAPH Level GNN
+gnn_model = GCN(hidden_channels=16)
+print(gnn_model)
 
-class GraphGNNModel(torch.nn.Module):
+import matplotlib.pyplot as plt
+from sklearn.manifold import TSNE
 
-    def __init__(self, c_in, c_hidden, c_out, dp_rate_linear=0.5, **kwargs):
-        """
-        Inputs:
-            c_in - Dimension of input features
-            c_hidden - Dimension of hidden features
-            c_out - Dimension of output features (usually number of classes)
-            dp_rate_linear - Dropout rate before the linear layer (usually much higher than inside the GNN)
-            kwargs - Additional arguments for the GNNModel object
-        """
-        super().__init__()
-        self.GNN = GNNModel(c_in=c_in,
-                            c_hidden=c_hidden,
-                            c_out=c_hidden, # Not our prediction output yet!
-                            **kwargs)
-        self.head = nn.Sequential(
-            nn.Dropout(dp_rate_linear),
-            nn.Linear(c_hidden, c_out)
-        )
+def visualize(h, color):
+    z = TSNE(n_components=2).fit_transform(h.detach().cpu().numpy())
 
-    def forward(self, x, edge_index, batch_idx):
-        """
-        Inputs:
-            x - Input features per node
-            edge_index - List of vertex index pairs representing the edges in the graph (PyTorch geometric notation)
-            batch_idx - Index of batch element for each node
-        """
-        x = self.GNN(x, edge_index)
-        x = geom_nn.global_mean_pool(x, batch_idx) # Average pooling
-        x = self.head(x)
-        return x
+    plt.figure(figsize=(10,10))
+    plt.xticks([])
+    plt.yticks([])
 
-###### DEFINING THE MULTILAYER PERCEPTRON
+    plt.scatter(z[:, 0], z[:, 1], s=70, c=color, cmap="Set2")
+    plt.show()
 
-class GraphLevelGNN(pl.LightningModule):
+gnn_model.eval()
 
-    def __init__(self, **model_kwargs):
-        super().__init__()
-        # Saving hyperparameters
-        self.save_hyperparameters()
+# out = gnn_model(data.x, data.edge_index)
+# visualize(out, color=data.y)
 
-        # Defining the model with **model_kwargs arguments defining the architecture
-        self.model = GraphGNNModel(**model_kwargs)
+# canonical training loop for a Pytorch Geometric GNN model gnn_model
+# create list of molecular graph objects from list of SMILES x_smiles and list of labels y
+# create dataloader for training
+dataloader = DataLoader(dataset = data_list, batch_size = 2**7)
+# define loss function
+loss_function = nn.MSELoss()
+# define optimiser
+optimiser = torch.optim.Adam(gnn_model.parameters(), lr = 1e-3)
+# loop over 10 training epochs
+for epoch in range(10):
+    # set model to training mode
+    gnn_model.train()
+    # loop over minibatches for training
+    for (k, batch) in enumerate(dataloader):
+        # compute current value of loss function via forward pass
+        output = gnn_model(batch)
+        loss_function_value = loss_function(output[:,0], torch.tensor(batch.y, dtype = torch.float32))
+        # set past gradient to zero
+        optimiser.zero_grad()
+        # compute current gradient via backward pass
+        loss_function_value.backward()
+        # update model weights using gradient and optimisation method
+        optimiser.step()
 
-        # Defining the Loss Function 
-        self.loss_module = nn.MSELoss()
+import torch_geometric
+tu_dataset = torch_geometric.datasets.TUDataset(root=CHECKPOINT_PATH, name="MUTAG")
 
-    
-    # Defining the forward pass 
-    def forward(self, data, mode="train"):
-        x, edge_index, batch_idx = data.x, data.edge_index, data.batch
-        x = self.model(x, edge_index, batch_idx)
-        x = x.squeeze(dim=-1)
-
-        if self.hparams.c_out == 1:
-            preds = (x > 0).float()
-            data.y = data.y.float()
-        else:
-            preds = x.argmax(dim=-1)
-        loss = self.loss_module(x, data.y)
-        acc = (preds == data.y).sum().float() / preds.shape[0]
-        return loss, acc
-    
-    # Configuring the Loss Function 
-    def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=1e-2, weight_decay=0.0) # High lr because of small dataset and small model
-        return optimizer
-    
-    # Returning the loss scores
-    def training_step(self, batch, batch_idx):
-        loss, acc = self.forward(batch, mode="train")
-        self.log('train_loss', loss)
-        self.log('train_acc', acc)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="val")
-        self.log('val_acc', acc)
-
-    def test_step(self, batch, batch_idx):
-        _, acc = self.forward(batch, mode="test")
-        self.log('test_acc', acc)
+print(tu_dataset.num_classes)
 
 ################## DEFINE TRAINING LOOP ###############################
 
@@ -383,6 +309,5 @@ class GraphLevelGNN(pl.LightningModule):
 #                                        num_layers=3,
 #                                        dp_rate_linear=0.5,
 #                                        dp_rate=0.0)
-
 
 
