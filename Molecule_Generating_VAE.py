@@ -20,6 +20,8 @@ working_dir = 'C:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction'
 # We can try using the dataset that Ashlie's group made to see if we can start to generate new molecules
 # Previous study used only 505 molecules in total to train (transfer learn?) pre-exisiting 
 
+#DOWNLOAD YOUR DATASET
+
 # csv_path = keras.utils.get_file(
 #     f"{working_dir}/250k_rndm_zinc_drugs_clean_3.csv",
 #     "https://raw.githubusercontent.com/aspuru-guzik-group/chemical_vae/master/models/zinc_properties/250k_rndm_zinc_drugs_clean_3.csv")
@@ -58,23 +60,114 @@ BATCH_SIZE = 100
 EPOCHS = 10
 
 VAE_Learning_Rate = 5e-4
-NUM_ATOMS = 120 # Max number of atoms in a single molecule
+NUM_ATOMS = 120 # Max number of atoms in a single molecule, determines max length of generated atoms
 
 ATOM_TYPES = len(SMILES_CHARSET) # Different number of atom types
-BOND_DIM = 5
+BOND_DIM = 5 #Number of bond types (including non-bonds)
 LATENT_SPACE_DIMENSIONS = 435 # Need to find out if more or fewer dimensions make a difference
+
+TRAINING_FRAC = 0.9 #Percentage of dataset to be used for training VAE
 
 # FUNCTION TO CONVERT SMILES STRINGS TO GRAPHS
 
 def SMILES_to_graph(SMILES):
     # Converts input SMILES string to rdkit object
     # Can do the same for InCHI, will this result in the same rdkit object?
-
     Molecule = Chem.MolFromSmiles(SMILES)
 
-    # Initialise adjacency and feature tensors
+    # Initialise adjacency and feature matrices with zeros
     Adjacency_Matrix = np.zeros((BOND_DIM, NUM_ATOMS, NUM_ATOMS), "float32")
     Feature_Matrix = np.zeros((NUM_ATOMS, ATOM_TYPES), "float32")
+
+    # Iterate over every atom in molecule to populate Adjacency and Feature Matrices
+    for atom in Molecule.GetAtoms():
+        i = atom.getIdx() # Gets atom's index in the molecule
+
+        # Maps atom type to atom symbols we defined above
+        Element = atom_mapping[atom.GetSymbol()] 
+        
+        Feature_Matrix[i] = np.eye(ATOM_TYPES)[Element] 
+        print(Feature_Matrix[i])  ####Checking to see what line above does
+        
+        # Iterate over one-hop neighbors of atom to characterise its bonds
+        for neighbour in atom.GetNeighbors():
+            
+            # Gets atom index of neighbours to atom in question
+            j = neighbour.GetIdx()
+            
+            # Returns bond type from the RDKit object
+            bond = Molecule.GetBondBetweenAtoms(i, j) 
+            
+            # Get bond type/name from mapping that we created above
+            bond_type_idx = bond_mapping[bond.GetBondType().name] 
+            
+            # Update the Adjacency Matrix with bond entry(matrix is one-hot encoded)
+            Adjacency_Matrix[bond_type_idx, [i, j], [j, i]] = 1  
+        
+        # Dealing with non-bond instances
+        Adjacency_Matrix[-1, np.sum(Adjacency_Matrix, axis=0) == 0] = 1
+
+        # Dealing with non-atom instances
+        Feature_Matrix[np.where(np.sum(Feature_Matrix, axis=1) == 0)[0], -1] = 1
+
+        return Adjacency_Matrix, Feature_Matrix
+
+def graph_to_molecule(graph):
+    # Unpack the graph into feature and adjacency matrices
+    Adjacency_Matrix, Feature_Matrix = graph
+
+    Molecule = Chem.RWMol()
+
+    # Removing 'non-atoms' and atoms with no bonds (remove disconnected fragments)
+    # Doing this using np.where which choose from list of variables depending on some conditions
+
+    Keep_Index = np.where(np.argmax(Feature_Matrix, axis=1) != ATOM_TYPES) & (np.sum(Adjacency_Matrix[:-1], axis=(0, 1)) !=0)[0]
+
+    print(f'Feature_Matrix before non atom removal: \n {Feature_Matrix} \n')
+
+    Feature_Matrix = Feature_Matrix[Keep_Index]
+    
+    print(f'Feature_Matrix after non atom removal: \n {Feature_Matrix} \n')
+
+    print(f'Adjacency_Matrix before non atom removal: \n {Feature_Matrix} \n')
+    
+    Adjacency_Matrix = Adjacency_Matrix[:, Keep_Index, :][:, :, Keep_Index]
+
+    print(f'Adjacency_Matrix after non atom removal: \n {Feature_Matrix} \n')
+    
+    # Adding Atoms to Molecule
+
+    for Atom_Type_Index in np.argmax(Feature_Matrix, axis=1):
+        Atom = Chem.Atom(atom_mapping[Atom_Type_Index])
+        _ = Molecule.AddAtom(Atom)
+
+        # Add bonds between the atoms in the Molecule (from upper triangle of Matrix (#TODO why tho?)) 
+        (Bonds_ij, Atoms_i, Atoms_j) = np.where(np.triu(Adjacency_Matrix) == 1)
+
+        for(bond_ij, atom_i, atom_j) in zip(Bonds_ij, Atoms_i, Atoms_j):
+
+            # Checking for aromatic bonds
+            if atom_i == atom_j or bond_ij == BOND_DIM - 1:
+                continue
+            Bond_Type = bond_mapping[bond_ij]
+            Molecule.AddBond(int(atom_i), int(atom_j), Bond_Type)
+
+            # Sanitize the molecule
+            # https://www.rdkit.org/docs/RDKit_Book.html#molecular-sanitization
+            flag = Chem.SanitizeMol(Molecule, catchErrors=True)
+
+            # Return None if sanitization fails 
+            if flag != Chem.SanitizeFlags.SANITIZE_NONE:
+                return None
+
+            return Molecule
+    
+# MAKING THE TRAINING DATASET
+
+# DEFINING THE MODEL ARCHITECTURE
+
+
+
 
 
 
