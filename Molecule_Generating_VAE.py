@@ -121,7 +121,7 @@ def graph_to_molecule(graph):
     # Removing 'non-atoms' and atoms with no bonds (remove disconnected fragments)
     # Doing this using np.where which choose from list of variables depending on some conditions
 
-    Keep_Index = np.where(np.argmax(Feature_Matrix, axis=1) != ATOM_TYPES) & (np.sum(Adjacency_Matrix[:-1], axis=(0, 1)) !=0)[0]
+    Keep_Index = np.where(np.argmax(Feature_Matrix, axis = 1) != ATOM_TYPES) & (np.sum(Adjacency_Matrix[:-1], axis = (0, 1)) !=0)[0]
 
     print(f'Feature_Matrix before non atom removal: \n {Feature_Matrix} \n')
 
@@ -164,14 +164,114 @@ def graph_to_molecule(graph):
     
 # MAKING THE TRAINING DATASET
 
+train_df = df.sample(frac = TRAINING_FRAC, random_state = 42)
+train_df.reset_index(drop = True, inplace = True)
+
+Adjacency_Tensors, Feature_Tensors, QED_Tensors = [], [], []
+
+# Assuming CSV format 
+for Index in range(8000):
+    
+    # Retrieve SMILES string from dataset and converting it to graph format
+    Adjacency_Tensor, Feature_Tensor = SMILES_to_graph(train_df.loc[Index]['smiles'])
+
+    # Retrieving target property tensor from dataset
+    QED_Tensor = train_df.loc[Index]['qed']
+    
+    Adjacency_Tensors.append(Adjacency_Tensor)
+    Feature_Tensors.append(Feature_Tensor)
+    QED_Tensors.append(QED_Tensor)
+
+Adjacency_Tensors = np.array(Adjacency_Tensors)
+Feature_Tensors = np.array(Feature_Tensors)
+QED_Tensors = np.array(QED_Tensors)
+
 # DEFINING THE MODEL ARCHITECTURE
 
+# Define Graph Convolutional Layer
 
+GraphConvolutionLayer_HiddenUnits = 128 # Hidden units in Graph Convolutional Layers
 
+class GraphConvolutionLayer(keras.layers.Layer):
+    def __init__(
+            self,
+            units = GraphConvolutionLayer_HiddenUnits,
+            activation = 'relu',
+            use_bias = False,
+            kernel_initializer = "glorot_uniform", # Define initialisation of layer weights
+            bias_initializer = 'zeros',
+            kernel_regularizer = None, # What are these regularisers?
+            bias_regularizer = None,
+            **kwargs
+    ):
+        super.__init__(**kwargs)
+        
+        self.units = units,
+        self.activation = keras.activations.get(activation),
+        self.use_bias = use_bias,
+        self.kernel_initializer = keras.initializers.get(kernel_initializer),
+        self.bias_initializer = keras.initializers.get(bias_initializer),
+        self.kernal_regularizer = keras.initializers.get(kernel_regularizer),
+        self.bias_regularizer = keras.initializers.get(bias_regularizer)
 
+    def build(self, input_shape):
+        bond_dim = input_shape[0][1]
+        atom_dim = input_shape[1][2]
 
+        # Define trainabliity of weights in layers
+        self.kernel = self.add_weight(
+            shape = (bond_dim, atom_dim, self.units),
+            initializer = self.kernel_initializer,
+            regularizer = self.kernal_regularizer,
+            trainiable = True,
+            name = 'Weights',
+            dtype = tf.float32
+        )
 
+        # Define trainability of bias parameters
+        if self.use_bias:
+            self.bias = self.add_weight(
+                shape = (bond_dim, 1, self.units),
+                initializer = self.bias_initializer,
+                regularizer = self.bias_regularizer,
+                trainable = True,
+                name = 'Bias',
+                dtype = tf.float32
+            )
+        
+        self.built = True
 
+    # Define method for inference
+    def call(self, inputs, training=False):
+        Adjacency_Matrix, Feature_Matrix = inputs
+
+        # Get information from neighbors wiht a matrix multiplication (a new matrix representing the type of atoms next to a specified atom)
+        x = tf.matmul(Adjacency_Matrix, Feature_Matrix[:, None, :, :])
+
+        # Apply a linear transformation according to the layer and associated activation function
+        x = tf.matmul(x, self.kernel)
+
+        # Apply bias 
+        if self.use_bias:
+            x += self.bias
+
+        # Reduce bond types dimensions
+
+        x_reduced = tf.reduce_sum(x, axis=1)
+
+        # Apply the activation function
+        return self.activation(x_reduced)
+    
+# DEFINING THE ENCODER AND DECODER LAYERS
+
+def get_encoder(
+        gconv_units, latent_dim, adjacency_shape, feature_shape, dense_units, dropout_rate):
+    adjacency = keras.layers.Input(shape = adjacency_shape)
+    features = keras.layers.Input(shape = feature_shape)
+
+    features_transformed = features
+    for units in gconv_units:
+        features_transformed = GraphConvolutionLayer(units)([adjacency, features_transformed])
 
 #Can we constrain VAE to target generating molecules with desirable properties?
 
