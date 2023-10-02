@@ -190,7 +190,11 @@ QED_Tensors = np.array(QED_Tensors)
 
 # Define Graph Convolutional Layer
 
-GraphConvolutionLayer_HiddenUnits = 128 # Hidden units in Graph Convolutional Layers
+# Hidden units in Graph Convolutional Layers
+GraphConvolutionLayer_HiddenUnits = 128 
+
+# Hidden units dropout rate
+DropoutRate = 0.2
 
 class GraphConvolutionLayer(keras.layers.Layer):
     def __init__(
@@ -266,12 +270,46 @@ class GraphConvolutionLayer(keras.layers.Layer):
 
 def get_encoder(
         gconv_units, latent_dim, adjacency_shape, feature_shape, dense_units, dropout_rate):
-    adjacency = keras.layers.Input(shape = adjacency_shape)
-    features = keras.layers.Input(shape = feature_shape)
+    adjacency = keras.layers.Input(shape= adjacency_shape)
+    features = keras.layers.Input(shape= feature_shape)
 
     features_transformed = features
     for units in gconv_units:
         features_transformed = GraphConvolutionLayer(units)([adjacency, features_transformed])
+
+    # Reduce molecular representation to 1D
+    x = keras.layers.GlobalAveragePooling1D()(features_transformed)
+
+    # Forward pass
+    for units in dense_units:
+        x = layers.Dense(units, activation="relu")(x)
+        x = layers.Dropout(dropout_rate)(x)
+
+    z_mean = layers.Dense(latent_dim, dtype= 'flaot32', name= "z_mean")(x)
+    log_var = layers.Dense(latent_dim, dtype= 'float32', name= "log_var")(x)
+
+    encoder = keras.Model([adjacency, features], [z_mean, log_var], name= "encoder")
+
+    return encoder
+
+def get_decoder(dense_units, dropout_rate, latent_dim, adjacency_shape, feature_shape):
+    latent_inputs = keras.Input(shape= (latent_dim,))
+
+    x = latent_inputs
+    for units in dense_units:
+        x = keras.layers.Dense(units, activation= "tanh")(x)
+        x = keras.layers.Dropout(dropout_rate)(x)
+
+    # Map outputs of previous layer to [continuous adjacency tensors]
+    x_adjacency = keras.layers.Dense(tf.math.reduce_prod(adjacency_shape))(x)
+    x_adjacency = keras.layers.Reshape(adjacency_shape)(x_adjacency)
+
+    # Make tensors symmetrical in the last two dimensions
+    x_adjacency = (x_adjacency + tf.transpose(x_adjacency, (0, 1, 3, 2))) / 2
+
+    #
+    x_adjacency = keras.layers.Softmax(axis=2)(x_features)
+
 
 #Can we constrain VAE to target generating molecules with desirable properties?
 
