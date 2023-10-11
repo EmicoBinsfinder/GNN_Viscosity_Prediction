@@ -9,7 +9,7 @@ Steps:
 1. Load off-diagonal stress tensors in
 2. Plot evolution of these stress tensors
 3. Find autocorrelation of each of these tensors
-4.
+4. Extract volume from output files (figure out what the unit is)
 """
 
 import pandas as pd
