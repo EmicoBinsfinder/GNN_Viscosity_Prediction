@@ -80,7 +80,8 @@ fragments = [Chem.MolFromSmiles(x) for x in fragments]
 starting_molecule = Chem.MolFromSmiles('CCC')
 combo = Chem.CombineMols(fragments[2], starting_molecule)
 
-print(Chem.GetAdjacencyMatrix(combo))
+#Finds disconnected molecules in a SMILES string
+print(Chem.GetMolFrags(combo))
 
 
 # for atom in combo.GetAtoms():
