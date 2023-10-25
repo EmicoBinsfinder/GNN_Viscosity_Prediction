@@ -176,9 +176,11 @@ Mut_Mol = Starting_molecule.GetMol()
 
 #Check if chemical rules are violated
 # I should store the violation in the object, along with the generated SMILES string, may be useful later on 
-Mut_Mol_Sanitzed = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
 
-img = Draw.MolToImage(Mut_Mol_Sanitzed)
+Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+print(Mut_Mol_Sanitized)
+
+img = Draw.MolToImage(Mut_Mol)
 img.show()
 
 def AddAtom(StartingMolecule, NewAtoms=Atoms, Probabilities=[1, 1, 1]):
@@ -190,6 +192,9 @@ def AddAtom(StartingMolecule, NewAtoms=Atoms, Probabilities=[1, 1, 1]):
     Takes molecule, adds atom based on defined probabilities of position
      
     """
+
+def DeleteAtom():
+     pass 
 
 
 # for atom in combo.GetAtoms():
