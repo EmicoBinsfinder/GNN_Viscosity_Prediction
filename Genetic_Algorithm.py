@@ -28,7 +28,11 @@ CONSIDERATIONS
 
 - Best way to initialise population
 
+- How to penalise long surviving molecules to encourage even greater diversity in later generations
+
 - Need to determine how to handle crossovers
+
+- How to know if something is a gas or liquid
 
 - Are we only going to add to end points
     - Maybe a coinflip or some form of distribution to determine where alteration is made
@@ -38,7 +42,7 @@ CONSIDERATIONS
 - How to implement a validity check before evaluating the fitness of molecules in a generation and which validity checks to implement
     - Can the molecule be parameterised?
 
-- How to ensure that we are actually generating molecules that will be liquid at room temperature 
+- How to ensure that we are actually generating molecules that will be liquid at room temperature (how do we design gaseous lubricants)
 
 - Need to decide best fingerprint for calculating molecular similarity
 
@@ -49,6 +53,7 @@ CONSIDERATIONS
 from rdkit import Chem
 from rdkit.Chem import Draw
 import rdkit
+import random
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import MolDrawing, DrawingOptions
 DrawingOptions.includeAtomNumbers=True
@@ -64,9 +69,7 @@ skatole = Chem.MolFromSmiles('CC1=CNC2=CC=CC=C12')
 benzene = Chem.MolFromSmiles('c1ccccc1')
 quinoline = Chem.MolFromSmiles('n1cccc2ccccc12')
 
-
 my_molecules = [naphthalene, benzoxazole, indane, skatole, benzene, quinoline]
-
 
 #### Test genetic algorithm starting from benzene
 
@@ -74,14 +77,119 @@ my_molecules = [naphthalene, benzoxazole, indane, skatole, benzene, quinoline]
 Need to decide if centers are secondary, tertiary or quarternary
 """
 
+### Fragments
 fragments = ['c1ccccc1', 'CCC', 'CC(C)CCCCCCCOC(=O)CCCCC(=O)OCCCCCCCC(C)C', 'CC', 'CCCC', 'CCCCC', 'CCCCCCC']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
+
+### Atom Numbers
+Atoms = ['C', 'O']
+AtomMolObjects = [Chem.MolFromSmiles(x) for x in Atoms]
+AtomicNumbers = []
+
+## Getting Atomic Numbers for Additive Atoms
+for Object in AtomMolObjects:
+     for atom in Object.GetAtoms():
+          AtomicNumbers.append(atom.GetAtomicNum())         
+
+# Bond Types
+BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
 
 starting_molecule = Chem.MolFromSmiles('CCC')
 combo = Chem.CombineMols(fragments[2], starting_molecule)
 
 #Finds disconnected molecules in a SMILES string
-print(Chem.GetMolFrags(combo))
+frags = Chem.GetMolFrags(combo)
+
+#Steps
+
+"""
+1. Combine molecules into a singular SMILES object 
+2. Create separate objects for each fragment in SMILES string 
+3. Check bond types for each bond for each atom in each fragment, maybe create separate list containing atoms with each bond type
+4. Check whether bonds are aromatic, will need to Kekulize SMILES strings to enable this
+5. Check number of rings in the structure
+5. Assign probablilities to each potential mutation
+6. Select a mutation based on probabilities, taking into account information from starting structure
+
+
+Possible Mutations
+- Add Atom
+- Delete Atom (RWMOL.removeAtom)
+- Replace Atom
+- Change Bond Order
+- Delete Ring
+- Add Ring
+- Add Fragment 
+- Delete Fragment
+
+Steps for each Mutation
+"""
+
+Starting_molecule = Chem.MolFromSmiles('CCCCCC')
+
+# Change to an editable object
+Starting_molecule = Chem.RWMol(Starting_molecule)
+
+# Add selected atom from list of addable atoms 
+x = Starting_molecule.AddAtom(Chem.Atom(8))
+
+# Storing indexes of newly added atom and atoms from intial molecule
+
+frags = Chem.GetMolFrags(Starting_molecule)
+
+# Check which object is the newly added atom
+# Don't assume new atom index is always added to end of GetMolFrags object
+
+for ind, frag in enumerate(frags):
+    print(ind, frag)
+    if len(frag) == 1:
+        #Store index of Atom in Object
+        NewAtomIdx = frags[ind]
+    else:
+        StartMolIdxs = frags[ind]
+
+
+"""
+There are 3 possible outcomes from adding a molecule:
+
+- Branching with single Bond
+- Branch with double bond
+- Extension
+
+"""
+
+#
+Starting_molecule.AddBond(3, NewAtomIdx[0], random.choice(BondTypes))
+#Starting_molecule.AddBond(6, 7, BondTypes[1])
+
+
+# Adding bonds to new atom
+"""
+How to know if we are adding bonds in the right place?
+We'd need to check if there is an aromatic ring
+I'd assume that we'd be able to get away with selecting two random adjacent atom ids 
+and just adding that way if they are not part of a ring or a branch intersection
+"""
+
+# Convert back to editable molecule for illustration
+Mut_Mol = Starting_molecule.GetMol()
+
+#Check if chemical rules are violated
+# I should store the violation in the object, along with the generated SMILES string, may be useful later on 
+Mut_Mol_Sanitzed = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+
+img = Draw.MolToImage(Mut_Mol_Sanitzed)
+img.show()
+
+def AddAtom(StartingMolecule, NewAtoms=Atoms, Probabilities=[1, 1, 1]):
+    """
+    Function that Adds Atom atom from 
+
+    Need to ensure that probability of this is zero if length of molecule is too short.
+
+    Takes molecule, adds atom based on defined probabilities of position
+     
+    """
 
 
 # for atom in combo.GetAtoms():
@@ -93,12 +201,9 @@ print(Chem.GetMolFrags(combo))
 #           print(atom.GetAtomicNum())
 #           print(bond.GetBondType())
 
-for atom in combo.GetAtoms():
-    # For each atom, set the property "atomNote" to a index+1 of the atom
-    atom.SetProp("atomNote", str(atom.GetIdx()+1))
-
-img = Draw.MolToImage(combo)
-img.show()
+# for atom in combo.GetAtoms():
+#     # For each atom, set the property "atomNote" to a index+1 of the atom
+#     atom.SetProp("atomNote", str(atom.GetIdx()+1))
 
 # edcombo = Chem.EditableMol(combo)
 # edcombo.AddBond(1, 20,order=Chem.rdchem.BondType.SINGLE)
