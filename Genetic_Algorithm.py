@@ -154,7 +154,7 @@ There are 3 possible outcomes from adding a molecule:
 
 - Branching with single Bond
 - Branch with double bond
-- Extension
+- Extension at ends of 
 
 """
 
@@ -178,7 +178,12 @@ Mut_Mol = Starting_molecule.GetMol()
 # I should store the violation in the object, along with the generated SMILES string, may be useful later on 
 
 Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-print(Mut_Mol_Sanitized)
+
+if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+     print('Validity Check Passed')
+else:
+     print('Validity Check Failed')
+     print(Mut_Mol_Sanitized)
 
 img = Draw.MolToImage(Mut_Mol)
 img.show()
