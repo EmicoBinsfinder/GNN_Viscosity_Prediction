@@ -46,6 +46,10 @@ CONSIDERATIONS
 
 - Need to decide best fingerprint for calculating molecular similarity
 
+- Need to make sure that there are no duplicates in a given generation
+
+- Need a parameter for elitism
+
 """
 
 ################# IMPORTS ###################
@@ -56,51 +60,76 @@ import rdkit
 import random
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import MolDrawing, DrawingOptions
+from rdkit.Chem import rdFMCS
+from rdkit.Chem.Draw import rdDepictor
+from random import choice as rnd
+
 DrawingOptions.includeAtomNumbers=True
 DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
+def view_difference(Starting_Molecule, Mutated_Molecule):
+    mcs = rdFMCS.FindMCS([Starting_Molecule, Mutated_Molecule]) #Find maximum common substructure (MCS)
+    mcs_mol = Chem.MolFromSmarts(mcs.smartsString) #Convert MCS to Mol Object
+    match1 = Starting_Molecule.GetSubstructMatch(mcs_mol) #Atom indexes of atoms present in both molecules
 
-############## Defining different molecule types ###################
-naphthalene = Chem.MolFromSmiles('c12ccccc1cccc2')
-benzoxazole = Chem.MolFromSmiles('n1c2ccccc2oc1')
-indane = Chem.MolFromSmiles('c1ccc2c(c1)CCC2')
-skatole = Chem.MolFromSmiles('CC1=CNC2=CC=CC=C12')
-benzene = Chem.MolFromSmiles('c1ccccc1')
-quinoline = Chem.MolFromSmiles('n1cccc2ccccc12')
+    ##Check first molecule
+    target_atm1 = []
+    target_bond1 = []
 
-my_molecules = [naphthalene, benzoxazole, indane, skatole, benzene, quinoline]
+    for bond in Starting_Molecule.GetBonds():
+        #Get indexes of molecules of interest
+        StartIdx = bond.GetBeginAtomIdx() 
+        EndIdx = bond.GetEndAtomIdx()
+        if StartIdx or EndIdx not in match1:
+            target_bond1.append(Starting_Molecule.GetBondBetweenAtoms(StartIdx, EndIdx).GetIdx())    
+
+    for atom in Starting_Molecule.GetAtoms():
+        if atom.GetIdx() not in match1: #Adding to list molecules that aren't in starting molecule
+            target_atm1.append(atom.GetIdx()) #Adding missing molecules to list object
+    
+    #Check second molecule
+    match2 = Mutated_Molecule.GetSubstructMatch(mcs_mol)
+    target_atm2 = []
+    target_bond2 = []
+
+    for bond in Mutated_Molecule.GetBonds():
+        #Get indexes of molecules of interest
+        StartIdx = bond.GetBeginAtomIdx() 
+        EndIdx = bond.GetEndAtomIdx()
+        if StartIdx or EndIdx not in match1:
+            target_bond2.append(Starting_Molecule.GetBondBetweenAtoms(StartIdx, EndIdx).GetIdx())    
+
+    for atom in Mutated_Molecule.GetAtoms():
+        if atom.GetIdx() not in match2:
+            target_atm2.append(atom.GetIdx())
+    
+    img = Draw.MolsToGridImage([Starting_molecule, Mutated_Molecule],highlightAtomLists=[target_atm1, target_atm2], highlightBondLists=[target_bond1, target_bond2])
+    img.show()
 
 #### Test genetic algorithm starting from benzene
 
 """
-Need to decide if centers are secondary, tertiary or quarternary
+Need to decide if centers are secondary, tertiary or quarternary if working with PAOs
 """
 
 ### Fragments
-fragments = ['c1ccccc1', 'CCC', 'CC(C)CCCCCCCOC(=O)CCCCC(=O)OCCCCCCCC(C)C', 'CC', 'CCCC', 'CCCCC', 'CCCCCCC']
+fragments = ['c1ccccc1', 'CCCC', 'CCCCC', 'CCCCCCC', 'CCCCCCCC', 'CCCCCCCCC', 'CCCCCCCCCC']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
-### Atom Numbers
+### ATOM NUMBERS
+
 Atoms = ['C', 'O']
 AtomMolObjects = [Chem.MolFromSmiles(x) for x in Atoms]
 AtomicNumbers = []
 
-## Getting Atomic Numbers for Additive Atoms
+# Getting Atomic Numbers for Addable Atoms
 for Object in AtomMolObjects:
      for atom in Object.GetAtoms():
           AtomicNumbers.append(atom.GetAtomicNum())         
 
-# Bond Types
+### BOND TYPES
 BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
-
-starting_molecule = Chem.MolFromSmiles('CCC')
-combo = Chem.CombineMols(fragments[2], starting_molecule)
-
-#Finds disconnected molecules in a SMILES string
-frags = Chem.GetMolFrags(combo)
-
-#Steps
 
 """
 1. Combine molecules into a singular SMILES object 
@@ -109,8 +138,7 @@ frags = Chem.GetMolFrags(combo)
 4. Check whether bonds are aromatic, will need to Kekulize SMILES strings to enable this
 5. Check number of rings in the structure
 5. Assign probablilities to each potential mutation
-6. Select a mutation based on probabilities, taking into account information from starting structure
-
+6. Select a mutation based on probabilities, taking into account information from starting structure (just start with random probabilities)
 
 Possible Mutations
 - Add Atom
@@ -125,13 +153,13 @@ Possible Mutations
 Steps for each Mutation
 """
 
-Starting_molecule = Chem.MolFromSmiles('CCCCCC')
+Starting_molecule_Unedited = rnd(fragments)
 
 # Change to an editable object
-Starting_molecule = Chem.RWMol(Starting_molecule)
+Starting_molecule = Chem.RWMol(Starting_molecule_Unedited)
 
 # Add selected atom from list of addable atoms 
-x = Starting_molecule.AddAtom(Chem.Atom(8))
+x = Starting_molecule.AddAtom(Chem.Atom(int(rnd(AtomicNumbers))))
 
 # Storing indexes of newly added atom and atoms from intial molecule
 
@@ -141,29 +169,23 @@ frags = Chem.GetMolFrags(Starting_molecule)
 # Don't assume new atom index is always added to end of GetMolFrags object
 
 for ind, frag in enumerate(frags):
-    print(ind, frag)
     if len(frag) == 1:
         #Store index of Atom in Object
         NewAtomIdx = frags[ind]
     else:
         StartMolIdxs = frags[ind]
 
-
 """
 There are 3 possible outcomes from adding a molecule:
-
 - Branching with single Bond
 - Branch with double bond
-- Extension at ends of 
-
+- Extension at ends of Molecules
 """
 
-#
-Starting_molecule.AddBond(3, NewAtomIdx[0], random.choice(BondTypes))
+Starting_molecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], random.choice(BondTypes))
 #Starting_molecule.AddBond(6, 7, BondTypes[1])
 
-
-# Adding bonds to new atom
+#### ADDING NEW BONDS TO ATOMS
 """
 How to know if we are adding bonds in the right place?
 We'd need to check if there is an aromatic ring
@@ -185,21 +207,66 @@ else:
      print('Validity Check Failed')
      print(Mut_Mol_Sanitized)
 
-img = Draw.MolToImage(Mut_Mol)
-img.show()
+# Code to view difference between starting molecule and final molecule
 
-def AddAtom(StartingMolecule, NewAtoms=Atoms, Probabilities=[1, 1, 1]):
+
+view_difference(Starting_molecule_Unedited, Mut_Mol)
+
+
+def AddAtom(StartingMolecule, NewAtoms=Atoms, showdiff=False):
     """
-    Function that Adds Atom atom from 
+    Function that adds atom from a list of selected atoms to a starting molecule.
 
     Need to ensure that probability of this is zero if length of molecule is too short.
 
-    Takes molecule, adds atom based on defined probabilities of position
+    Takes molecule, adds atom based on defined probabilities of position.
+
+    Arguments:
+        - StartingMolecule: SMILES String of Starting Molecule
+        - NewAtoms: List of atoms that could be added to starting molecule
+        - Show Difference: If True, shows illustration of changes to molecule
      
     """
+    Starting_molecule_Unedited = rnd(fragments)
+
+    # Change to an editable object
+    Starting_molecule = Chem.RWMol(Starting_molecule_Unedited)
+
+    # Add selected atom from list of addable atoms 
+    x = Starting_molecule.AddAtom(Chem.Atom(int(rnd(AtomicNumbers))))
+
+    # Storing indexes of newly added atom and atoms from intial molecule
+    frags = Chem.GetMolFrags(Starting_molecule)
+
+    # Check which object is the newly added atom
+    for ind, frag in enumerate(frags):
+        print(ind, frag)
+        if len(frag) == 1:
+            #Store index of new atom in object
+            NewAtomIdx = frags[ind]
+        else:
+            StartMolIdxs = frags[ind]
+    
+    Starting_molecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], random.choice(BondTypes))
+
+    #Starting_molecule.AddBond(, NewAtomIdx[0], random.choice(BondTypes))
+
+    # SMILES string chemical validity check
+    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+
+    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+        print('Validity Check Passed')
+    else:
+        print('Validity Check Failed')
+   
+    if showdiff:
+        view_difference(Starting_molecule_Unedited, Mut_Mol)
+
+  
 
 def DeleteAtom():
      pass 
+
 
 
 # for atom in combo.GetAtoms():
@@ -231,14 +298,6 @@ def DeleteAtom():
 # img = Draw.MolToImage(edcombo)
 # img.show()
 
-
-
-
-
-
-
-
-
 ############ Code to Highlight certain Bonds
 
 # Could be useful to show generational changes as CReM does
@@ -257,7 +316,6 @@ d = rdMolDraw2D.MolDraw2DSVG(500, 500) # or MolDraw2DCairo to get PNGs
 rdMolDraw2D.PrepareAndDrawMolecule(d, mol, highlightAtoms=hit_ats,
                                    highlightBonds=hit_bonds)
 """
-
 """
 Code for substructure searching 
 m = Chem.MolFromSmiles('c1ccccc1O')
