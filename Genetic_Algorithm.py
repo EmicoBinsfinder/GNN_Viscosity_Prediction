@@ -22,7 +22,6 @@ Possible Mutations
 - Add Atom
 - Replace Atom
 - Change Bond Order
-- Add Ring
 - Add Fragment 
 - Replace Fragment
 
@@ -33,6 +32,9 @@ CONSTRAINTS
 CONSIDERATIONS
 
 - Think about using Python pickle structure to save molecules for speeding up molecule loading
+
+- Maybe a way to store the history of mutations made to a molecule, so that we can adjust (reduce) probabilities of certain
+mutations occurring and reoccuring based on past events, increasing range of molecules chekced out.
 
 - Best way to initialise population
 
@@ -108,7 +110,6 @@ bond type
 5. Assign probablilities to each potential mutation
 6. Select a mutation based on probabilities, taking into account information from starting structure (just start with 
 random probabilities)
-Steps for each Mutation
 """
 
 def AddAtom(StartingMolecule, NewAtoms, showdiff=False):
@@ -144,9 +145,7 @@ def AddAtom(StartingMolecule, NewAtoms, showdiff=False):
         else:
             StartMolIdxs = frags[ind]
     
-    Starting_molecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], random.choice(BondTypes))
-
-    #Starting_molecule.AddBond(, NewAtomIdx[0], random.choice(BondTypes))
+    Starting_molecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], rnd(BondTypes))
 
     # SMILES string chemical validity check
     Mut_Mol = Starting_molecule.GetMol()
@@ -225,8 +224,7 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False):
 #ReplaceAtom(rnd(fragments), AtomicNumbers, fromAromatic=False, showdiff=True)
 
 
-
-def ReplaceBond(StartingMolecule, Bonds, showdiff=False):
+def ReplaceBond(StartingMolecule, Bonds, showdiff=True):
     """
     Function to replace bond type with a different bond type from a selected list of bonds within a starting molecule.
     
@@ -242,54 +240,86 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=False):
     4. Get index and bondtype of bond to be replaced
     """
 
+    StartingMoleculeUnedited = StartingMolecule
 
-Bonds = BondTypes
+    BondIdxs = []
+    for bond in StartingMoleculeUnedited.GetBonds():
+            # Check if atom is Aromatic
+            if bond.GetIsAromatic():
+                continue
+            else:
+                BondIdxs.append(bond.GetIdx())
 
-StartingMoleculeUnedited = rnd(fragments)
+    print(f'Number of Bonds molecule has = {len(StartingMoleculeUnedited.GetBonds())}')
+    #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
 
-BondIdxs = []
-for bond in StartingMoleculeUnedited.GetBonds():
-        # Check if atom is Aromatic
-        if bond.GetIsAromatic():
-            continue
-        else:
-            BondIdxs.append(bond.GetIdx())
+    print(BondIdxs)
 
-print(f'Number of Bonds molecules has = {len(StartingMoleculeUnedited.GetBonds())}')
-#Select atom to be deleted from list of atom indexes, check that this list is greater than 0
+    #Random selection of bond to be replaced
+    if len(BondIdxs) > 0:
+        ReplaceBondIdx = rnd(BondIdxs)
+    else:
+        print('Empty Bond Index List')
 
-print(BondIdxs)
+    #Excluding selected bond's bond order from list of potential new bond orders
+    ReplaceBondType = StartingMoleculeUnedited.GetBondWithIdx(ReplaceBondIdx).GetBondType()
+    BondReplacements = [x for x in Bonds if x != ReplaceBondType]
 
-if len(BondIdxs) > 0:
-    ReplaceBondIdx = rnd(BondIdxs)
-else:
-    print('Empty Bond Index List')
+    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
 
-ReplaceBondType = StartingMoleculeUnedited.GetBondWithIdx(ReplaceBondIdx).GetBondType()
+    #Get atoms that selected bond is bonded to 
+    ReplacedBond = StartingMolecule.GetBondWithIdx(ReplaceBondIdx)
+    Atom1 = ReplacedBond.GetBeginAtomIdx()
+    Atom2 = ReplacedBond.GetEndAtomIdx()
 
-BondReplacements = [x for x in Bonds if x != ReplaceBondType]
-print(BondReplacements)
+    #Replace bond, randomly selecting new bond order from list of possible bond orders
+    StartingMolecule.RemoveBond(Atom1, Atom2)
+    StartingMolecule.AddBond(Atom1, Atom2, rnd(BondReplacements))
 
-StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+    Mut_Mol = StartingMolecule.GetMol()
 
-print(type(rnd(BondReplacements)))
+    #Sanitize molecule
+    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
 
-StartingMolecule.ReplaceBond(ReplaceBondIdx, rnd(BondReplacements), preserveProps=True)
+    if showdiff:
+        view_difference(StartingMoleculeUnedited, Mut_Mol)
 
-# print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
-#         replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
+## TESTING ReplaceAtom Function
+#ReplaceBond(rnd(fragments), BondTypes, showdiff=True)
 
-Mut_Mol = StartingMolecule.GetMol()
+def AddFragment(StartingMolecule, fragments, showdiff=True):
+    """
+    Function to add a fragment from a selected list of fragments to starting molecule.
+    
+    Args:
+    - StartingMolecule: SMILES String of Starting Molecule
+    - Fragments: List of fragments 
+    """
+    """
+    Steps:
+    1. Select fragment 
+    2. Determine whether fragment is going to be inserted within or appended to end of molecule
+    
+    3. If appended to end of starting molecule:
+        - Combine starting molecule and fragment into single disconnected Mol object 
+        - Split atom indexes of starting molecule and fragment and save in different objects
+        - Check number of bonds each atom has in starting molecule and fragment, exclude any atoms that don't have 
+        exactly two bonds
+        - Randomly select one of 2-bonded atoms and store the index of the Atom, and store bond objects of atom's bonds
+        - Store the indexes of the start and end atom of each of the atom's two bonds
+        - Remove these bonds from starting molecule index
+        - Randomly select a first atom from   
+        
+    4. If append to end of molecule:
+       - Combine starting molecule and fragment into single disconnected Mol object 
+       - Split atom indexes of starting molecule and fragment and save in different objects
+       - Check number of bonds each atom has in starting molecule and fragment, exclude any atoms with more than 1 bond
+       - Randomly pick atom from list of atoms with exactly one bond and store index 
+       - Randomly pick atom from list of atoms in fragment and store index
+       - Select type of bond to create between selected atom from molecule and from fragment
+       - Create bond between selected single bond atom and 
 
-#Sanitize molecule
-Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
-
-view_difference(StartingMoleculeUnedited, Mut_Mol)
-
-
-
-
-
+    """
 
 
 
