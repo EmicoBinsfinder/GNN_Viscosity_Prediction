@@ -447,7 +447,14 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
 
             FragAdd = rnd(['Aromatic', 'Non-Aromatic'])
 
-            if FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
+            if len(OneBondAtomsMolecule) == 0:
+                print('No one-bonded terminal atoms in starting molecule, returning empty object')
+                Mut_Mol = None
+                Mut_Mol_Sanitized = None
+                MutMolSMILES = None
+
+
+            elif FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
                 #Randomly choose atom from fragment (including aromatic)
                 FragAtom = rnd(FragIdxs)
 
@@ -613,14 +620,13 @@ def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', show
 
         if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
             print('Validity Check Passed')
+            if showdiff:
+                view_difference(StartingMoleculeUnedited, Mut_Mol)
         else:
             print('Validity Check Failed')
             Mut_Mol = None
             Mut_Mol_Sanitized = None
             MutMolSMILES = None
-
-        if showdiff:
-            view_difference(StartingMoleculeUnedited, Mut_Mol)
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
@@ -631,7 +637,6 @@ def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', show
 ###### Implementing Genetic Algorithm Using Functions Above
 
 Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'AddFragment', 'InsertBenzene']
-
 
 counter = 0
 attempts = 0
@@ -656,12 +661,16 @@ while counter < 30:
     #Set initial conditions to start mutations
     if counter == 0:
         StartingMolecule = rnd(fragments) #Select starting molecule
+        StartingMoleculeSMILES = Chem.MolToSmiles(StartingMolecule)
+        print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
     else:
         StartingMolecule = StartingMolecule
         StartingMoleculeSMILES = StartingMoleculeSMILES
         print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
 
     #Perform mutation
+
+    print(Mutation)
     if Mutation == 'AddAtom':
         result = AddAtom(StartingMolecule, AtomicNumbers, showdiff=True)
 
@@ -673,10 +682,10 @@ while counter < 30:
 
     elif Mutation == 'AddFragment':
         InsertStyle = rnd(['Within', 'Egde'])
-        result = AddFragment(rnd(fragments), rnd(fragments), InsertStyle='Edge', showdiff=True)
+        result = AddFragment(StartingMolecule, rnd(fragments), InsertStyle='Edge', showdiff=True)
     else:
         InsertStyle = rnd(['Within', 'Egde'])
-        result = InsertBenzene(rnd(fragments), AromaticMolecule, showdiff=True, InsertStyle='Edge')
+        result = InsertBenzene(StartingMolecule, AromaticMolecule, showdiff=True, InsertStyle='Edge')
     
     if result[2] == None:
         continue
