@@ -155,18 +155,25 @@ def AddAtom(StartingMolecule, NewAtoms, showdiff=False):
 
     # SMILES string chemical validity check
     Mut_Mol = Starting_molecule.GetMol()
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
+    MutMolSMILES = Chem.MolToSmiles(Mut_Mol) # Get SMILES string for storage, automatically canonicalised
+    
+    #Sanitize molecule
+    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
     if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
         print('Validity Check Passed')
+        if showdiff:
+            view_difference(Starting_molecule_Unedited, Mut_Mol)
     else:
         print('Validity Check Failed')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
    
-    if showdiff:
-        view_difference(Starting_molecule_Unedited, Mut_Mol)
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
 ### TESTING AddAtom Function
-#AddAtom(rnd(fragments), AtomicNumbers, showdiff=True)
+# for x in list(range(50)):
+#     result = AddAtom(rnd(fragments), AtomicNumbers, showdiff=True)
 
 def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False):
     """
@@ -200,35 +207,50 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False):
             print(f'Number of Bonds atom has = {len(atom.GetBonds())}')
 
     #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
-    if len(AtomIdxs) > 0:
-        ReplaceAtomIdx = rnd(AtomIdxs)
-    else:
+    if len(AtomIdxs) == 0:
         print('Empty Atom Index List')
-
-    #Exclude replaced atom type from list of atoms to do replacing with
-    ReplaceAtomType = StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetAtomicNum()
-    AtomReplacements = [x for x in NewAtoms if x != ReplaceAtomType]
-
-    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-
-    #Replace atom
-    ReplacementAtom = rnd(AtomReplacements)
-    StartingMolecule.ReplaceAtom(ReplaceAtomIdx, Chem.Atom(ReplacementAtom), preserveProps=True)
-
-    print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
-          replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
     
-    Mut_Mol = StartingMolecule.GetMol()
+    else:
+        #Select a random atom from the index of potential replacement atoms
+        ReplaceAtomIdx = rnd(AtomIdxs)
+        #Exclude replaced atom type from list of atoms to do replacing with
+        ReplaceAtomType = StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()
+        AtomReplacements = [x for x in NewAtoms if x != ReplaceAtomType]
+        print(AtomReplacements)
 
-    #Sanitize molecule
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
 
-    if showdiff:
-        view_difference(StartingMoleculeUnedited, Mut_Mol)
+        #Replace atom
+        ReplacementAtom = rnd(AtomReplacements)
+        StartingMolecule.ReplaceAtom(ReplaceAtomIdx, Chem.Atom(ReplacementAtom), preserveProps=True)
 
-### TESTING ReplaceAtom Function
-#ReplaceAtom(rnd(fragments), AtomicNumbers, fromAromatic=False, showdiff=True)
+        print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
+            replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
+        
+        Mut_Mol = StartingMolecule.GetMol()
+        MutMolSMILES = Chem.MolToSmiles(Mut_Mol) # Get SMILES string for storage, automatically canonicalised
 
+        #Sanitize molecule
+        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
+        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+            print('Validity Check Passed')
+        else:
+            print('Validity Check Failed')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
+
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
+
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
+
+# TESTING ReplaceAtom Function
+# for x in list(range(50)):
+#     result = ReplaceAtom(rnd(fragments), Atoms, fromAromatic=False, showdiff=True)
 
 def ReplaceBond(StartingMolecule, Bonds, showdiff=True):
     """
@@ -261,68 +283,51 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=True):
     #Random selection of bond to be replaced
     if len(BondIdxs) > 0:
         ReplaceBondIdx = rnd(BondIdxs)
+
+        #Excluding selected bond's bond order from list of potential new bond orders
+        ReplaceBondType = StartingMoleculeUnedited.GetBondWithIdx(ReplaceBondIdx).GetBondType()
+        BondReplacements = [x for x in Bonds if x != ReplaceBondType]
+
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+
+        #Get atoms that selected bond is bonded to 
+        ReplacedBond = StartingMolecule.GetBondWithIdx(ReplaceBondIdx)
+        Atom1 = ReplacedBond.GetBeginAtomIdx()
+        Atom2 = ReplacedBond.GetEndAtomIdx()
+
+        #Replace bond, randomly selecting new bond order from list of possible bond orders
+        StartingMolecule.RemoveBond(Atom1, Atom2)
+        StartingMolecule.AddBond(Atom1, Atom2, rnd(BondReplacements))
+
+        Mut_Mol = StartingMolecule.GetMol()
+        MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
+
+        #Sanitize molecule
+        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
+        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+            print('Validity Check Passed')
+        else:
+            print('Validity Check Failed')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
+
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
+        
     else:
         print('Empty Bond Index List')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
 
-    #Excluding selected bond's bond order from list of potential new bond orders
-    ReplaceBondType = StartingMoleculeUnedited.GetBondWithIdx(ReplaceBondIdx).GetBondType()
-    BondReplacements = [x for x in Bonds if x != ReplaceBondType]
+    return Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES
 
-    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+## TESTING ReplaceBond Function
+# for x in list(range(50)):
+#     result = ReplaceBond(rnd(fragments), BondTypes, showdiff=True)
 
-    #Get atoms that selected bond is bonded to 
-    ReplacedBond = StartingMolecule.GetBondWithIdx(ReplaceBondIdx)
-    Atom1 = ReplacedBond.GetBeginAtomIdx()
-    Atom2 = ReplacedBond.GetEndAtomIdx()
-
-    #Replace bond, randomly selecting new bond order from list of possible bond orders
-    StartingMolecule.RemoveBond(Atom1, Atom2)
-    StartingMolecule.AddBond(Atom1, Atom2, rnd(BondReplacements))
-
-    Mut_Mol = StartingMolecule.GetMol()
-
-    #Sanitize molecule
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
-
-    if showdiff:
-        view_difference(StartingMoleculeUnedited, Mut_Mol)
-
-## TESTING ReplaceAtom Function
-#ReplaceBond(rnd(fragments), BondTypes, showdiff=True)
-
-
-def AddFragment(StartingMolecule, fragments, showdiff=True):
-
-    """
-    5. If append to starting molecule terminal atom:
-       - Combine starting molecule and fragment into single disconnected Mol object 
-       - Split atom indexes of starting molecule and fragment and save in different objects
-       - Check number of bonds each atom has in starting molecule and fragment, exclude any atoms with more than 1 bond
-       - Randomly pick atom from list of atoms with exactly one bond and store index 
-       - Randomly pick atom from list of atoms in fragment and store index
-       - Select type of bond to create between selected atom from molecule and from fragment
-       - Create bond between selected single bond atom and selected atom from fragment
-
-    6. If creating a branch (joining fragment at one of its terminal atoms) 
-
-       - Select fragment to be added to starting molecule
-       - Split atom indexes of starting molecule and fragment and save in different objects
-       - Check if fragment is aromatic
-
-       If fragment aromatic:
-        - Randomly select unique atom from cyclic molecule
-        - Check number of bonds each atom has in starting molecule and fragment, exclude any atoms that don't have 
-        exactly two bonds
-        - Randomly select one of 2-bonded atoms and store the index of the Atom
-        - Create a bond between selected 2-bonded atom and selected atom in cyclic molecule
-       
-        Else:
-        - Check bonds of fragment and select an atom with only one bond 
-        - Randomly select an atom in the starting molecule that has exactly two bonds
-        - Create bond between selected atoms from fragment and from 
-    """
-
-def AddFragment(StartingMolecule, Fragment, showdiff=True):
+def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=True):
     """
     Function to add a fragment from a selected list of fragments to starting molecule.
     
@@ -349,86 +354,140 @@ def AddFragment(StartingMolecule, Fragment, showdiff=True):
         - Randomly select two terminal atoms from terminal atoms list of fragment
         - Create a new bond between each of the neighbors of the target atom and each of the terminal atoms on the 
         fragment, specify which type of bond, with highest likelihood that it is a single bond
+        """
     
-    """
     StartingMoleculeUnedited = StartingMolecule
     Fragment = Fragment
 
-    # Add fragment to Mol object of starting molecule
-    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-    StartingMolecule.InsertMol(Fragment)
+    #Always check if fragment is a cyclic (benzene) molecule
+    if len(Fragment.GetAromaticAtoms()) == len(Fragment.GetAtoms()):
+        print('Fragment aromatic, inappropriate function')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+    elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
+        print('Starting molecule is completely aromatic')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
 
-    # Get indexes of starting molecule and fragment, store them in separate objects 
-    frags = Chem.GetMolFrags(StartingMolecule)
-    StartMolIdxs = frags[0]
-    FragIdxs = frags[1]
+    else:
+        # Add fragment to Mol object of starting molecule
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+        StartingMolecule.InsertMol(Fragment)
 
-    OneBondAtomsMolecule = []
-    TwoBondAtomsMolecule = []
-    OneBondAtomsFragment = []
-    TwoBondAtomsFragment = []
+        # Get indexes of starting molecule and fragment, store them in separate objects 
+        frags = Chem.GetMolFrags(StartingMolecule)
+        StartMolIdxs = frags[0]
+        FragIdxs = frags[1]
 
-    # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
-    for index in StartMolIdxs:
-        Atom = StartingMolecule.GetAtomWithIdx(int(index))
-        if len(Atom.GetBonds()) == 2:
-            TwoBondAtomsMolecule.append(index)
-        elif len(Atom.GetBonds()) == 1:
-            OneBondAtomsMolecule.append(index)
+        OneBondAtomsMolecule = []
+        TwoBondAtomsMolecule = []
+        AromaticAtomsMolecule = []
+        OneBondAtomsFragment = []
+        TwoBondAtomsFragment = []
+
+        # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
+        for index in StartMolIdxs:
+            Atom = StartingMolecule.GetAtomWithIdx(int(index))
+            if Atom.GetIsAromatic() and len(Atom.GetBonds()) == 2:
+                AromaticAtomsMolecule.append(index)
+            elif len(Atom.GetBonds()) == 2:
+                TwoBondAtomsMolecule.append(index)
+            elif len(Atom.GetBonds()) == 1:
+                OneBondAtomsMolecule.append(index)
+            else:
+                continue
+
+        # Getting atoms in fragment with varying bonds, storing indexes in listv
+        for index in FragIdxs:
+            Atom = StartingMolecule.GetAtomWithIdx(int(index))
+            if len(Atom.GetBonds()) == 1:
+                OneBondAtomsFragment.append(index)
+            elif len(Atom.GetBonds()) == 2:
+                TwoBondAtomsFragment.append(index)
+
+        ### INSERTING FRAGMENT AT RANDOM POINT WITHIN STARTING MOLECULE
+        if InsertStyle == 'Within':
+            # Select random two bonded atom, not including aromatic
+            AtomRmv = rnd(TwoBondAtomsMolecule)
+
+            # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
+            neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
+
+            # Randomly choose which bond of target atom to sever
+            SeverIdx = rnd([0,1])
+
+            StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
+
+            #Create a bond between the fragment and the now segmented fragments of the starting molecule
+            #For situation where bond before target atom is severed
+            if SeverIdx == 0:
+                StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv - 1, Chem.BondType.SINGLE)
+                StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
+            #For situation where bond after target atom is severed
+            else:
+                StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv + 1, Chem.BondType.SINGLE) 
+                StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
+
+        ### INSERTING FRAGMENT AT END OF STARTING MOLECULE
+
+        elif InsertStyle == 'Edge':
+            # Choose whether fragment will be added to an aromatic or non-aromatic bond
+
+            FragAdd = rnd(['Aromatic', 'Non-Aromatic'])
+
+            if FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
+                #Randomly choose atom from fragment (including aromatic)
+                FragAtom = rnd(FragIdxs)
+
+                #Select random terminal from starting molecule
+                AtomRmv = rnd(OneBondAtomsMolecule)
+
+                #Attach fragment to end of molecule
+                StartingMolecule.AddBond(FragAtom, AtomRmv, Chem.BondType.SINGLE) 
+
+            elif len(AromaticAtomsMolecule) > 0:
+                #Randomly select 2 bonded (non-branch base) aromatic atom 
+                ArmtcAtom = rnd(AromaticAtomsMolecule)
+
+                #Randomly select terminal atom from fragment
+                FragAtom = rnd(OneBondAtomsFragment)
+
+                #Add Bond
+                StartingMolecule.AddBond(ArmtcAtom, FragAtom, Chem.BondType.SINGLE)
+            
+            else:
+                print('Edge case, returning empty objects')
+                Mut_Mol = None
+                Mut_Mol_Sanitized = None
+                MutMolSMILES = None
+
+
+        Mut_Mol = StartingMolecule.GetMol()
+        MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
+
+        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+
+        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+            print('Validity Check Passed')
         else:
-            continue
-
-    # Getting atoms in fragment with varying bonds, storing indexes in listv
-    for index in FragIdxs:
-        Atom = StartingMolecule.GetAtomWithIdx(int(index))
-        if len(Atom.GetBonds()) == 1:
-            OneBondAtomsFragment.append(index)
-        elif len(Atom.GetBonds()) == 2:
-            TwoBondAtomsFragment.append(index)
-
-    ### INSERTING FRAGMENT AT RANDOM POINT IN STARTING MOLECULE
-
-    # Select random two bonded atom
-    AtomRmv = rnd(TwoBondAtomsMolecule)
-
-    # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
-    neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
-
-    # Randomly choose which bond of target atom to sever
-    SeverIdx = rnd([0,1])
-
-    StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
-
-    #Create a bond between the fragment and the now segmented fragments of the starting molecule
-
-    #For situation where bond before target atom is severed
-    if SeverIdx == 0:
-        StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv - 1, Chem.BondType.SINGLE)
-        StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
-    #For situation where bond after target atom is severed
-    else:
-        StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv + 1, Chem.BondType.SINGLE) 
-        StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
-
-    Mut_Mol = StartingMolecule.GetMol()
-    MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-    print(MutMolSMILES)
-
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-        print('Validity Check Passed')
-    else:
-        print('Validity Check Failed')
-    
-    if showdiff:
-        view_difference(StartingMoleculeUnedited, Mut_Mol)
+            print('Validity Check Failed')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
+        
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
+        
+        return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
 ## TESTING AddFragment Function
-#AddFragment(rnd(fragments), rnd(fragments), showdiff=True)
+# for x in list(range(100)):
+#     result = AddFragment(rnd(fragments), rnd(fragments), InsertStyle='Within', showdiff=True)
+#     print(result)
 
-
-def InsertBezene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=True):
+def InsertBezene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False):
 
     """
     Function to insert an aromatic atom into a starting molecule
@@ -447,60 +506,82 @@ def InsertBezene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showd
     fragment 
     """
 
-    StartingMoleculeUnedited = rnd(fragments)
-    Fragment = fragments[-1] 
+    StartingMoleculeUnedited = StartingMolecule
+    Fragment = AromaticMolecule
 
-    #Always check if fragment is a cyclic (benzene) molecule
+    #Always check if fragment or starting molecule is a cyclic (benzene) molecule
+
     if len(Fragment.GetAromaticAtoms()) != len(Fragment.GetAtoms()):
-        print('Atom is not Cyclic')
+        print('Fragment is not cyclic')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+    elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
+        print('Starting molecule is completely aromatic')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
 
-    Chem.SanitizeMol(Fragment)
+    else:
+        Chem.SanitizeMol(Fragment)
 
-    # Add fragment to Mol object of starting molecule
-    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-    StartingMolecule.InsertMol(Fragment)
+        # Add fragment to Mol object of starting molecule
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+        StartingMolecule.InsertMol(Fragment)
 
-    # Get indexes of starting molecule and fragment, store them in separate objects 
-    frags = Chem.GetMolFrags(StartingMolecule)
-    StartMolIdxs = frags[0]
-    FragIdxs = frags[1]
+        # Get indexes of starting molecule and fragment, store them in separate objects 
+        frags = Chem.GetMolFrags(StartingMolecule)
+        StartMolIdxs = frags[0]
+        FragIdxs = frags[1]
 
-    OneBondAtomsMolecule = []
-    TwoBondAtomsMolecule = []
+        OneBondAtomsMolecule = []
+        TwoBondAtomsMolecule = []
+        AromaticAtomsMolecule = []
 
-    # Getting atoms in starting molecule with different amount of bonds, storing indexes in lists
-    for index in StartMolIdxs:
-        Atom = StartingMolecule.GetAtomWithIdx(int(index))
-        if len(Atom.GetBonds()) == 2:
-            TwoBondAtomsMolecule.append(index)
-        elif len(Atom.GetBonds()) == 1:
-            OneBondAtomsMolecule.append(index)
-        else:
-            continue
+        # Getting atoms in starting molecule with different amount of bonds, storing indexes in lists
+        for index in StartMolIdxs:
+            Atom = StartingMolecule.GetAtomWithIdx(int(index))
+            if Atom.GetIsAromatic():
+                AromaticAtomsMolecule.append(index) 
+            if len(Atom.GetBonds()) == 2:
+                TwoBondAtomsMolecule.append(index)
+            elif len(Atom.GetBonds()) == 1:
+                OneBondAtomsMolecule.append(index)
+            else:
+                continue
 
-    if InsertStyle == 'Within':
-        # Randomly choose two unique atoms from aromatic molecule
-        ArmtcAtoms = sample(FragIdxs, 2)
+        if InsertStyle == 'Within':
+            # Randomly choose two unique atoms from aromatic molecule
+            ArmtcAtoms = sample(FragIdxs, 2)
 
-        # Select random two bonded atom
-        AtomRmv = rnd(TwoBondAtomsMolecule)
+            # Select random two bonded atom
+            AtomRmv = rnd(TwoBondAtomsMolecule)
 
-        # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
-        neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
+            # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
+            neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
 
-        # Randomly choose which bond of target atom to sever
-        SeverIdx = rnd([0,1])
+            # Randomly choose which bond of target atom to sever
+            SeverIdx = rnd([0,1])
 
-        StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
+            StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
 
-        #For situation where bond before target atom is severed
-        if SeverIdx == 0:
-            StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv - 1, Chem.BondType.SINGLE)
-            StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
-        #For situation where bond after target atom is severed
-        else:
-            StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv + 1, Chem.BondType.SINGLE) 
-            StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
+            #For situation where bond before target atom is severed
+            if SeverIdx == 0:
+                StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv - 1, Chem.BondType.SINGLE)
+                StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
+            #For situation where bond after target atom is severed
+            else:
+                StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv + 1, Chem.BondType.SINGLE) 
+                StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
+
+        elif InsertStyle == 'Edge':
+            # Randomly choose two unique atoms from aromatic molecule
+            ArmtcAtoms = rnd(FragIdxs)
+
+            # Select random one bonded atom
+            AtomRmv = rnd(OneBondAtomsMolecule)
+
+            StartingMolecule.AddBond(ArmtcAtoms, AtomRmv, Chem.BondType.SINGLE) 
 
         Mut_Mol = StartingMolecule.GetMol()
         MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
@@ -511,35 +592,18 @@ def InsertBezene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showd
             print('Validity Check Passed')
         else:
             print('Validity Check Failed')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
 
-    elif InsertStyle == 'Edge':
-        # Randomly choose two unique atoms from aromatic molecule
-        ArmtcAtoms = rnd(FragIdxs)
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
 
-        # Select random one bonded atom
-        AtomRmv = rnd(OneBondAtomsMolecule)
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
-        StartingMolecule.AddBond(ArmtcAtoms, AtomRmv, Chem.BondType.SINGLE) 
+## TESTING InsertBenzene Function
+# for x in list(range(50)):
+#     result = InsertBezene(rnd(fragments), fragments[-1], showdiff=True, InsertStyle='Within')
 
-        Mut_Mol = StartingMolecule.GetMol()
-        MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
 
-        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-            print('Validity Check Passed')
-        else:
-            print('Validity Check Failed')
-
-    if showdiff:
-        view_difference(StartingMoleculeUnedited, Mut_Mol)
-
-def ReplaceFragment():
-    """
-    Function to replace a fragment in a starting molecule with another fragment from a selected list of fragments.
-    
-    Args:
-    - StartingMolecule: SMILES String of Starting Molecule
-    - Fragments: List of fragments 
-    """
 
