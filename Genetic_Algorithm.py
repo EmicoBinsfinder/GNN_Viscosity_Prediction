@@ -69,6 +69,17 @@ gaseous lubricants)
 - Need a parameter for elitism
 """
 
+
+
+"""
+Consecutive oxygens
+Double bonded carbons to double bonded oxygens
+50 heavy atoms 
+
+Look at COMPASS 3
+
+"""
+
 ################# IMPORTS ###################
 
 from rdkit import Chem
@@ -83,12 +94,37 @@ from random import choice as rnd
 from rdkit.Chem.Draw import rdMolDraw2D
 from MoleculeDifferenceViewer import view_difference
 
+def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff):
+    
+    Mut_Mol = StartingMolecule.GetMol()
+    MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
+
+    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+
+    if len(Chem.GetMolFrags(Mut_Mol)) != 1:
+        print('Validity Check Passed')
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
+    
+    elif Mut_Mol_Sanitized != rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
+        print('Validity Check Failed')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+
+    else: 
+        print('Validity Check Passed')
+        if showdiff:
+            view_difference(StartingMoleculeUnedited, Mut_Mol)
+    
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
+
 DrawingOptions.includeAtomNumbers=True
 DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
-fragments = ['CCCC', 'CCCCC', 'CCCCCCC', 'CCCCCCCC', 'CCCCCCCCC', 'CCCCCCCCCC', 'c1ccccc1']
+fragments = ['CCCC', 'CCCCC', 'CC', 'CCC', 'c1ccccc1']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
 ### ATOM NUMBERS
@@ -102,7 +138,7 @@ for Object in AtomMolObjects:
           AtomicNumbers.append(atom.GetAtomicNum())         
 
 ### BOND TYPES
-BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE, Chem.BondType.TRIPLE]
+BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
 
 """
 1. Combine molecules into a singular SMILES object 
@@ -129,43 +165,29 @@ def AddAtom(StartingMolecule, NewAtoms, showdiff=False):
         - NewAtoms: List of atoms that could be added to starting molecule
         - Show Difference: If True, shows illustration of changes to molecule
     """
-    Starting_molecule_Unedited = StartingMolecule
+    StartingMoleculeUnedited = StartingMolecule
 
     # Change to an editable object
-    Starting_molecule = Chem.RWMol(Starting_molecule_Unedited)
+    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
 
     # Add selected atom from list of addable atoms 
-    Starting_molecule.AddAtom(Chem.Atom(int(rnd(NewAtoms))))
+    StartingMolecule.AddAtom(Chem.Atom(int(rnd(NewAtoms))))
 
     # Storing indexes of newly added atom and atoms from intial molecule
-    frags = Chem.GetMolFrags(Starting_molecule)
+    frags = Chem.GetMolFrags(StartingMolecule)
 
     # Check which object is the newly added atom
     for ind, frag in enumerate(frags):
-        print(ind, frag)
         if len(frag) == 1:
             #Store index of new atom in object
             NewAtomIdx = frags[ind]
         else:
             StartMolIdxs = frags[ind]
     
-    Starting_molecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], rnd(BondTypes))
+    StartingMolecule.AddBond(rnd(StartMolIdxs), NewAtomIdx[0], rnd(BondTypes))
 
-    # SMILES string chemical validity check
-    Mut_Mol = Starting_molecule.GetMol()
-    MutMolSMILES = Chem.MolToSmiles(Mut_Mol) # Get SMILES string for storage, automatically canonicalised
-    
     #Sanitize molecule
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
-    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-        print('Validity Check Passed')
-        if showdiff:
-            view_difference(Starting_molecule_Unedited, Mut_Mol)
-    else:
-        print('Validity Check Failed')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
    
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
@@ -227,20 +249,7 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False):
         print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
             replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
         
-        Mut_Mol = StartingMolecule.GetMol()
-        MutMolSMILES = Chem.MolToSmiles(Mut_Mol) # Get SMILES string for storage, automatically canonicalised
-
-        #Sanitize molecule
-        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
-        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-            print('Validity Check Passed')
-            if showdiff:
-                view_difference(StartingMoleculeUnedited, Mut_Mol)
-        else:
-            print('Validity Check Failed')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
@@ -295,20 +304,7 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=True):
         StartingMolecule.RemoveBond(Atom1, Atom2)
         StartingMolecule.AddBond(Atom1, Atom2, rnd(BondReplacements))
 
-        Mut_Mol = StartingMolecule.GetMol()
-        MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-        #Sanitize molecule
-        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True)
-        if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-            print('Validity Check Passed')
-            if showdiff:
-                view_difference(StartingMoleculeUnedited, Mut_Mol)
-        else:
-            print('Validity Check Failed')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
         
     else:
         print('Empty Bond Index List')
@@ -449,15 +445,14 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
 
                     if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
                         print('Validity Check Passed')
+                    if showdiff:
+                        view_difference(StartingMoleculeUnedited, Mut_Mol)
                     else:
                         print('Validity Check Failed')
                         Mut_Mol = None
                         Mut_Mol_Sanitized = None
                         MutMolSMILES = None
                     
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
-
         ### INSERTING FRAGMENT AT END OF STARTING MOLECULE
 
         elif InsertStyle == 'Edge':
@@ -553,6 +548,8 @@ def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', show
     fragment 
     """
 
+    print(f'InsertStyle is: {InsertStyle}')
+
     StartingMoleculeUnedited = StartingMolecule
     Fragment = AromaticMolecule
 
@@ -618,30 +615,18 @@ def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', show
                 StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv - 1, Chem.BondType.SINGLE)
                 StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
 
-                Mut_Mol = StartingMolecule.GetMol()
-                MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                    print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
+                Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
+                                                                            StartingMolecule, 
+                                                                            showdiff)
 
             #For situation where bond after target atom is severed
             else:
                 StartingMolecule.AddBond(ArmtcAtoms[0], AtomRmv + 1, Chem.BondType.SINGLE) 
                 StartingMolecule.AddBond(ArmtcAtoms[1], AtomRmv, Chem.BondType.SINGLE)
 
-                Mut_Mol = StartingMolecule.GetMol()
-                MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                    print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
+                Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
+                                                                            StartingMolecule, 
+                                                                            showdiff)
 
         elif InsertStyle == 'Edge':
 
@@ -660,20 +645,9 @@ def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', show
 
                 StartingMolecule.AddBond(ArmtcAtoms, AtomRmv, Chem.BondType.SINGLE) 
 
-                Mut_Mol = StartingMolecule.GetMol()
-                MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                    print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
-                else:
-                    print('Validity Check Failed')
-                    Mut_Mol = None
-                    Mut_Mol_Sanitized = None
-                    MutMolSMILES = None
+                Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
+                                                                            StartingMolecule, 
+                                                                            showdiff)
             
         else:
             print('Edge case, returning empty objects')
@@ -696,10 +670,10 @@ attempts = 0
 GeneratedMolecules = {}
 
 """
-Need to add code to declare what mutation was attempted
+Need to check neighbors before inserting Benzene, to see if 
 """
 
-while counter < 20:
+while counter < 15:
     attempts += 1
     print(f'Number of attempts: {attempts}')
     print(f'Counter: {counter}')
@@ -742,26 +716,10 @@ while counter < 20:
     
     if result[2] == None:
         continue
+    elif len(Chem.GetMolFrags(result[0])) > 1:
+        continue 
     else:
         StartingMolecule = result[0]
         StartingMoleculeSMILES = result[2]
         counter +=1
     
-def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff):
-    
-    Mut_Mol = StartingMolecule.GetMol()
-    MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-        print('Validity Check Passed')
-        if showdiff:
-            view_difference(StartingMoleculeUnedited, Mut_Mol)
-    else:
-        print('Validity Check Failed')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
-    
-    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
