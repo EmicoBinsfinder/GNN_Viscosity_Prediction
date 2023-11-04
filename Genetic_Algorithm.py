@@ -670,7 +670,7 @@ attempts = 0
 GeneratedMolecules = {}
 
 """
-Need to check neighbors before inserting Benzene, to see if 
+Need to check neighbors before inserting Benzene, to see if neigbours are aromatic, not just the selected bonds
 """
 
 while counter < 15:
