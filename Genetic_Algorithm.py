@@ -45,12 +45,7 @@ visosity/conductivity to determine which modifications are best
 
 - How to penalise long surviving molecules to encourage even greater diversity in later generations
 
-- Need to determine how to handle crossovers
-
 - How to know if something is a gas or liquid
-
-- Are we only going to add to end points
-    - Maybe a coinflip or some form of distribution to determine which alteration is made
 
 - Decide a protocol for adding branches top 
 
@@ -67,9 +62,9 @@ gaseous lubricants)
 - Need to make sure that there are no duplicates in a given generation
 
 - Need a parameter for elitism
+
+- Make calls to initialise LAMMPS call and get viscosity value from the simulation
 """
-
-
 
 """
 Consecutive oxygens
@@ -102,7 +97,11 @@ def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff):
     Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
 
     if len(Chem.GetMolFrags(Mut_Mol)) != 1:
-        print('Validity Check Passed')
+        print('Fragmented result, trying new mutation')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+
         if showdiff:
             view_difference(StartingMoleculeUnedited, Mut_Mol)
     
@@ -124,7 +123,7 @@ DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
-fragments = ['CCCC', 'CCCCC', 'CC', 'CCC', 'c1ccccc1']
+fragments = ['CCCC', 'CCCCC', 'CC', 'CCC', 'c1ccccc1', 'CCCCCC']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
 ### ATOM NUMBERS
@@ -139,18 +138,6 @@ for Object in AtomMolObjects:
 
 ### BOND TYPES
 BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
-
-"""
-1. Combine molecules into a singular SMILES object 
-2. Create separate objects for each fragment in SMILES string 
-3. Check bond types for each bond for each atom in each fragment, maybe create separate list containing atoms with each 
-bond type
-4. Check whether bonds are aromatic, will need to Kekulize SMILES strings to enable this
-5. Check number of rings in the structure
-5. Assign probablilities to each potential mutation
-6. Select a mutation based on probabilities, taking into account information from starting structure (just start with 
-random probabilities)
-"""
 
 def AddAtom(StartingMolecule, NewAtoms, showdiff=False):
     """
@@ -350,177 +337,138 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
     StartingMoleculeUnedited = StartingMolecule
     Fragment = Fragment
 
-    #Always check if fragment is a cyclic (benzene) molecule
-    if len(Fragment.GetAromaticAtoms()) == len(Fragment.GetAtoms()):
-        print('Fragment aromatic, inappropriate function')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
-    elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
-        print('Starting molecule is completely aromatic')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
-    else:
-        # Add fragment to Mol object of starting molecule
-        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-        StartingMolecule.InsertMol(Fragment)
+    try:
+        #Always check if fragment is a cyclic (benzene) molecule
+        if len(Fragment.GetAromaticAtoms()) == len(Fragment.GetAtoms()):
+            print('Fragment aromatic, inappropriate function')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
+        elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
+            print('Starting molecule is completely aromatic')
+            Mut_Mol = None
+            Mut_Mol_Sanitized = None
+            MutMolSMILES = None
+        else:
+            # Add fragment to Mol object of starting molecule
+            StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+            StartingMolecule.InsertMol(Fragment)
 
-        # Get indexes of starting molecule and fragment, store them in separate objects 
-        frags = Chem.GetMolFrags(StartingMolecule)
-        StartMolIdxs = frags[0]
-        FragIdxs = frags[1]
+            # Get indexes of starting molecule and fragment, store them in separate objects 
+            frags = Chem.GetMolFrags(StartingMolecule)
+            StartMolIdxs = frags[0]
+            FragIdxs = frags[1]
 
-        OneBondAtomsMolecule = []
-        TwoBondAtomsMolecule = []
-        AromaticAtomsMolecule = []
-        OneBondAtomsFragment = []
-        TwoBondAtomsFragment = []
+            OneBondAtomsMolecule = []
+            TwoBondAtomsMolecule = []
+            AromaticAtomsMolecule = []
+            OneBondAtomsFragment = []
+            TwoBondAtomsFragment = []
 
-        # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
-        for index in StartMolIdxs:
-            Atom = StartingMolecule.GetAtomWithIdx(int(index))
-            if Atom.GetIsAromatic() and len(Atom.GetBonds()) == 2:
-                AromaticAtomsMolecule.append(index)
-            elif len(Atom.GetBonds()) == 2:
-                TwoBondAtomsMolecule.append(index)
-            elif len(Atom.GetBonds()) == 1:
-                OneBondAtomsMolecule.append(index)
-            else:
-                continue
-
-        # Getting atoms in fragment with varying bonds, storing indexes in listv
-        for index in FragIdxs:
-            Atom = StartingMolecule.GetAtomWithIdx(int(index))
-            if len(Atom.GetBonds()) == 1:
-                OneBondAtomsFragment.append(index)
-            elif len(Atom.GetBonds()) == 2:
-                TwoBondAtomsFragment.append(index)
-
-        ### INSERTING FRAGMENT AT RANDOM POINT WITHIN STARTING MOLECULE
-        if InsertStyle == 'Within':
-
-            if len(OneBondAtomsMolecule) == 0:
-                print('No one-bonded terminal atoms in starting molecule, returning empty object')
-                Mut_Mol = None
-                Mut_Mol_Sanitized = None
-                MutMolSMILES = None
-            
-            else:
-                # Select random two bonded atom, not including aromatic
-                AtomRmv = rnd(TwoBondAtomsMolecule)
-
-                # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
-                neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
-
-                # Randomly choose which bond of target atom to sever
-                SeverIdx = rnd([0,1])
-
-                StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
-
-                #Create a bond between the fragment and the now segmented fragments of the starting molecule
-                #For situation where bond before target atom is severed
-                if SeverIdx == 0:
-                    StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv - 1, Chem.BondType.SINGLE)
-                    StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
-
-                    Mut_Mol = StartingMolecule.GetMol()
-                    MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                        print('Validity Check Passed')
-                        if showdiff:
-                            view_difference(StartingMoleculeUnedited, Mut_Mol)
-                #For situation where bond after target atom is severed
+            # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
+            for index in StartMolIdxs:
+                Atom = StartingMolecule.GetAtomWithIdx(int(index))
+                if Atom.GetIsAromatic() and len(Atom.GetBonds()) == 2:
+                    AromaticAtomsMolecule.append(index)
+                elif len(Atom.GetBonds()) == 2:
+                    TwoBondAtomsMolecule.append(index)
+                elif len(Atom.GetBonds()) == 1:
+                    OneBondAtomsMolecule.append(index)
                 else:
-                    StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv + 1, Chem.BondType.SINGLE) 
-                    StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
+                    continue
 
-                    Mut_Mol = StartingMolecule.GetMol()
-                    MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
+            # Getting atoms in fragment with varying bonds, storing indexes in listv
+            for index in FragIdxs:
+                Atom = StartingMolecule.GetAtomWithIdx(int(index))
+                if len(Atom.GetBonds()) == 1:
+                    OneBondAtomsFragment.append(index)
+                elif len(Atom.GetBonds()) == 2:
+                    TwoBondAtomsFragment.append(index)
 
-                    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+            ### INSERTING FRAGMENT AT RANDOM POINT WITHIN STARTING MOLECULE
+            if InsertStyle == 'Within':
 
-                    if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                        print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
-                    else:
-                        print('Validity Check Failed')
-                        Mut_Mol = None
-                        Mut_Mol_Sanitized = None
-                        MutMolSMILES = None
-                    
-        ### INSERTING FRAGMENT AT END OF STARTING MOLECULE
-
-        elif InsertStyle == 'Edge':
-            # Choose whether fragment will be added to an aromatic or non-aromatic bond
-
-            FragAdd = rnd(['Aromatic', 'Non-Aromatic'])
-
-            if len(OneBondAtomsMolecule) == 0:
-                print('No one-bonded terminal atoms in starting molecule, returning empty object')
-                Mut_Mol = None
-                Mut_Mol_Sanitized = None
-                MutMolSMILES = None
-
-            elif FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
-                #Randomly choose atom from fragment (including aromatic)
-                FragAtom = rnd(FragIdxs)
-
-                #Select random terminal from starting molecule
-                AtomRmv = rnd(OneBondAtomsMolecule)
-
-                #Attach fragment to end of molecule
-                StartingMolecule.AddBond(FragAtom, AtomRmv, Chem.BondType.SINGLE)
-
-                Mut_Mol = StartingMolecule.GetMol()
-                MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                    print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
-                else:
-                    print('Validity Check Failed')
-                    Mut_Mol = None
-                    Mut_Mol_Sanitized = None
-                    MutMolSMILES = None 
-
-            elif len(AromaticAtomsMolecule) > 0:
-                #Randomly select 2 bonded (non-branch base) aromatic atom 
-                ArmtcAtom = rnd(AromaticAtomsMolecule)
-
-                #Randomly select terminal atom from fragment
-                FragAtom = rnd(OneBondAtomsFragment)
-
-                #Add Bond
-                StartingMolecule.AddBond(ArmtcAtom, FragAtom, Chem.BondType.SINGLE)
-
-                Mut_Mol = StartingMolecule.GetMol()
-                MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
-
-                Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
-
-                if Mut_Mol_Sanitized == rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
-                    print('Validity Check Passed')
-                    if showdiff:
-                        view_difference(StartingMoleculeUnedited, Mut_Mol)
-                else:
-                    print('Validity Check Failed')
+                if len(OneBondAtomsMolecule) == 0:
+                    print('No one-bonded terminal atoms in starting molecule, returning empty object')
                     Mut_Mol = None
                     Mut_Mol_Sanitized = None
                     MutMolSMILES = None
                 
-        else:
-            print('Edge case, returning empty objects')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+                else:
+                    # Select random two bonded atom, not including aromatic
+                    AtomRmv = rnd(TwoBondAtomsMolecule)
+
+                    # Get atom neighbor indexes, remove bonds between selected atom and neighbors 
+                    neighbors = [x.GetIdx() for x in StartingMolecule.GetAtomWithIdx(AtomRmv).GetNeighbors()]
+
+                    # Randomly choose which bond of target atom to sever
+                    SeverIdx = rnd([0,1])
+
+                    StartingMolecule.RemoveBond(neighbors[SeverIdx], AtomRmv)
+
+                    #Create a bond between the fragment and the now segmented fragments of the starting molecule
+                    #For situation where bond before target atom is severed
+                    if SeverIdx == 0:
+
+                        StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv - 1, Chem.BondType.SINGLE)
+                        StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
+
+                        Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+
+                    #For situation where bond after target atom is severed
+                    elif SeverIdx != 0:
+                        StartingMolecule.AddBond(OneBondAtomsFragment[0], AtomRmv + 1, Chem.BondType.SINGLE) 
+                        StartingMolecule.AddBond(OneBondAtomsFragment[1], AtomRmv, Chem.BondType.SINGLE)
+
+                        Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+
+            ### INSERTING FRAGMENT AT END OF STARTING MOLECULE
+
+            elif InsertStyle == 'Edge':
+                # Choose whether fragment will be added to an aromatic or non-aromatic bond
+
+                FragAdd = rnd(['Aromatic', 'Non-Aromatic'])
+
+                if len(OneBondAtomsMolecule) == 0:
+                    print('No one-bonded terminal atoms in starting molecule, returning empty object')
+                    Mut_Mol = None
+                    Mut_Mol_Sanitized = None
+                    MutMolSMILES = None
+
+                elif FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
+                    #Randomly choose atom from fragment (including aromatic)
+                    FragAtom = rnd(FragIdxs)
+
+                    #Select random terminal from starting molecule
+                    AtomRmv = rnd(OneBondAtomsMolecule)
+
+                    #Attach fragment to end of molecule
+                    StartingMolecule.AddBond(FragAtom, AtomRmv, Chem.BondType.SINGLE)
+
+                    Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+
+                elif len(AromaticAtomsMolecule) > 0:
+                    #Randomly select 2 bonded (non-branch base) aromatic atom 
+                    ArmtcAtom = rnd(AromaticAtomsMolecule)
+
+                    #Randomly select terminal atom from fragment
+                    FragAtom = rnd(OneBondAtomsFragment)
+
+                    #Add Bond
+                    StartingMolecule.AddBond(ArmtcAtom, FragAtom, Chem.BondType.SINGLE)
+
+                    Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+                    
+            else:
+                print('Edge case, returning empty objects')
+                Mut_Mol = None
+                Mut_Mol_Sanitized = None
+                MutMolSMILES = None
+    except:
+        print('Index error, starting molecule probably too short, trying different mutation')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
       
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
@@ -673,9 +621,11 @@ GeneratedMolecules = {}
 Need to check neighbors before inserting Benzene, to see if neigbours are aromatic, not just the selected bonds
 """
 
-while counter < 15:
+# First generation 
+
+while counter < 50:
     attempts += 1
-    print(f'Number of attempts: {attempts}')
+    print(f'\n#################################################################\nNumber of attempts: {attempts}')
     print(f'Counter: {counter}')
 
     # Randomly select a mutation, here is where we can set mutation probabilities
@@ -714,12 +664,32 @@ while counter < 15:
         InsertStyle = rnd(['Within', 'Egde'])
         result = InsertBenzene(StartingMolecule, AromaticMolecule, showdiff=True, InsertStyle=InsertStyle)
     
+    # Check for null results
     if result[2] == None:
         continue
+    
+    # Check for fragmentted results
     elif len(Chem.GetMolFrags(result[0])) > 1:
         continue 
     else:
         StartingMolecule = result[0]
         StartingMoleculeSMILES = result[2]
         counter +=1
-    
+
+# Subsequent generations 
+
+"""
+Immediate TO DOs
+
+- Store mutation history 
+- Change mutation history based 
+- Constraints for consecutive oxygen bonds
+- Double bonded carbons to double bonded oxygens
+- Selection of best performing molecules based on fitness function
+- Store results of each generation, with:
+    - Performance on fitness function
+    - SMILES string
+    - Mutation performed (maybe a numerical code)
+    - Mol Object
+    - How many generations it has survived?
+"""
