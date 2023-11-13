@@ -689,62 +689,57 @@ NumGenerations = 1
 
 # while MaxGenerations < 50:
 
-for i in GeneratedMolecules:
-    print(i)
+for i, (k,v) in enumerate(GeneratedMolecules.items()):
+    StartingMoleculeSMILES = k
+    StartingMolecule = GeneratedMolecules[k][0]
+    PreviousMutations = GeneratedMolecules[k][1]
+    NumHeavyAtoms = GeneratedMolecules[k][2]
 
-# for i,(k,v) in enumerate(GeneratedMolecules.items()):
-#     StartingMolecule = v[0]
-#     PreviousMutations = v[1]
-#     NumHeavyAtoms = v[2]
-#     StartingMoleculeMoleculeSMILES = k
-
-#     MutationList = [x for x in Mutations if x not in PreviousMutations]
+    MutationList = [x for x in Mutations if x not in PreviousMutations]
        
-#     attempts += 1
-#     print(f'\n#################################################################\nNumber of attempts: {attempts}')
-#     print(f'Counter: {attempts}')
+    print(f'\n#################################################################\nNumber of attempts: {attempts}')
 
-#     # Randomly select a mutation, here is where we can set mutation probabilities
-#     Mutation = rnd(MutationList)
+    # Randomly select a mutation, here is where we can set mutation probabilities
+    Mutation = rnd(MutationList)
 
-#     # Initialise Aromatic Ring
-#     AromaticMolecule = fragments[-1]
+    # Initialise Aromatic Ring
+    AromaticMolecule = fragments[-1]
 
-#     StartingMoleculeSMILES = StartingMoleculeSMILES
-#     print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
+    StartingMoleculeSMILES = StartingMoleculeSMILES
+    print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
 
-#     #Perform mutation
-#     print(f'Mutation being performed: {Mutation}')
-#     if Mutation == 'AddAtom':
-#         result = AddAtom(StartingMolecule, AtomicNumbers, showdiff=False)
+    #Perform mutation
+    print(f'Mutation being performed: {Mutation}')
+    if Mutation == 'AddAtom':
+        result = AddAtom(StartingMolecule, AtomicNumbers, showdiff=False)
 
-#     elif Mutation == 'ReplaceAtom':
-#         result = ReplaceAtom(StartingMolecule, Atoms, fromAromatic=False, showdiff=False)
+    elif Mutation == 'ReplaceAtom':
+        result = ReplaceAtom(StartingMolecule, Atoms, fromAromatic=False, showdiff=False)
 
-#     elif Mutation == 'ReplaceBond':
-#         result = ReplaceBond(StartingMolecule, BondTypes, showdiff=False)
+    elif Mutation == 'ReplaceBond':
+        result = ReplaceBond(StartingMolecule, BondTypes, showdiff=False)
 
-#     elif Mutation == 'AddFragment':
-#         InsertStyle = rnd(['Within', 'Egde'])
-#         result = AddFragment(StartingMolecule, rnd(fragments), InsertStyle=InsertStyle, showdiff=False)
-#     else:
-#         InsertStyle = rnd(['Within', 'Egde'])
-#         result = InsertBenzene(StartingMolecule, AromaticMolecule, showdiff=False, InsertStyle=InsertStyle)
+    elif Mutation == 'AddFragment':
+        InsertStyle = rnd(['Within', 'Egde'])
+        result = AddFragment(StartingMolecule, rnd(fragments), InsertStyle=InsertStyle, showdiff=False)
+    else:
+        InsertStyle = rnd(['Within', 'Egde'])
+        result = InsertBenzene(StartingMolecule, AromaticMolecule, showdiff=False, InsertStyle=InsertStyle)
     
-#     score = fitfunc(StartingMoleculeSMILES)
+    score = fitfunc(StartingMoleculeSMILES)
 
-#     # Check for null results
-#     if result[2] == None:
-#         continue
+    # Check for null results
+    if result[2] == None:
+        continue
     
-#     # Check for fragmentted results
-#     elif len(Chem.GetMolFrags(result[0])) > 1:
-#         continue 
+    # Check for fragmentted results
+    elif len(Chem.GetMolFrags(result[0])) > 1:
+        continue 
 
-#     else:
-#         StartingMolecule = result[0]
-#         StartingMoleculeSMILES = result[2]
-#         counter +=1
+    else:
+        StartingMolecule = result[0]
+        StartingMoleculeSMILES = result[2]
+        counter +=1
 
 """
 Immediate TO DOs
@@ -753,12 +748,6 @@ Immediate TO DOs
 - Constraints for consecutive oxygen bonds
 - Double bonded carbons to double bonded oxygens
 - Selection of best performing molecules based on fitness function
-- Store results of each generation, with:
-    - Performance on fitness function
-    - SMILES string
-    - Mutation performed (maybe a numerical code)
-    - Mol Object
-    - How many generations it has survived?
 - Check every single generated molecule against a master list of all molecules generated, 
 to prevent the same molecule being generated within different generations
 
