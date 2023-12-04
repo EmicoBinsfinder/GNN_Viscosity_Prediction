@@ -782,7 +782,7 @@ FirstGenerationAttempts = 0
 GeneratedMolecules = {}
 GenerationMolecules = []
 MaxNumHeavyAtoms = 50
-showdiff = False
+showdiff = True
 GenerationSize = 50
 
 # Initialise population 
