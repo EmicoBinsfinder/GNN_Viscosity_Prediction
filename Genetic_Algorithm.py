@@ -775,14 +775,14 @@ Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment
 
 # GENETIC ALGORITHM HYPERPARAMETERS
 
-Silent = True
+Silent = True # Edit outputs to only print if this flag is true 
 NumElite = 15
 counter = 0
 FirstGenerationAttempts = 0
 GeneratedMolecules = {}
 GenerationMolecules = []
 MaxNumHeavyAtoms = 50
-showdiff = True
+showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
 
 # Initialise population 
