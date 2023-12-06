@@ -10,12 +10,7 @@ from rdkit.Chem import AllChem
 def writeHeader(molname, loplsflag):
     print("""import "oplsaa.lt"    # <-- defines the standard "OPLSAA" force field""")
     if loplsflag:
-        print("""import "loplsaa.lt"   # <-- custom parameters for long alkane chains taken from
-                      #     Sui et al. J.Chem.Theory.Comp (2012), 8, 1459
-                      #     To use the ordinary OPLSAA force field parameters,
-                      #     (instead of the Sui et al. parameters), change the
-                      #     atom types below from "@atom:81L","@atom:85LCH2" to
-                      #     "@atom:81" and "@atom:85"  (defined in "oplsaa.lt")""")
+        print("""import "loplsaa.lt" """)
     print("""{0} inherits OPLSAA {{""".format(molname))
 
 def writeFooter(molname):
@@ -99,12 +94,16 @@ def sum_of_charges(m, cdict):
         atype = atom.GetProp('AtomType')
         print("# Atom {0} is type {1} with charge {2}".format(atom.GetIdx(),atype,cdict[atype]))
         test_sum += cdict[atype]
+        
     print("# The sum of the atomic charges is: {:.2f}".format(test_sum))
     if abs(test_sum) > 0.001:
         print("""
             # WARNING: The net charge appears to be non-zero! This may indicate
             incompatible atom types.
             """)
+
+    return test_sum    
+    
 
 def generateFeatureDefn(fpath, fdefout, cdictout):
     """Write a feature definition file in RDKit style from the moltemplate
@@ -226,8 +225,10 @@ Check the SMARTS pattern that defines the expected atom type.""")
             lopls_cdict = read_cdict('./lopls_lt_dict.pkl')
             opls_cdict.update(lopls_cdict)
 
-        sum_of_charges(m,opls_cdict)
-
+    charge = sum_of_charges(m,opls_cdict)
+    
+    return charge
 
 if __name__=='__main__':
-    main()
+    charge = main()
+    print(f'#{charge:.5f}')
