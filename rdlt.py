@@ -87,7 +87,6 @@ def lt_to_molecule(ltfn):
     AllChem.EmbedMolecule(newmol,AllChem.ETKDG())
     print(Chem.MolToSmiles(newmol))
 
-
 def read_cdict(cdictin):
     with open(cdictin, 'rb') as f:
         cdict = pickle.load(f)
@@ -138,7 +137,6 @@ EndFeature""".format(lttype, patt, feat_index, atomname)
 
     with open(cdictout,'wb') as f:
         pickle.dump(cdict,f, protocol=2)
-
 
 def main():
     parser = argparse.ArgumentParser()
