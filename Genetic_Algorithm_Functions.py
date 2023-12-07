@@ -116,81 +116,44 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False, 
 
     AtomIdxs = []
 
-    if Verbose:
-        for atom in StartingMoleculeUnedited.GetAtoms():
-            if fromAromatic == False:
-                # Check if atom is Aromatic
-                if atom.GetIsAromatic():
-                    continue
-                else:
-                    AtomIdxs.append(atom.GetIdx())
+    for atom in StartingMoleculeUnedited.GetAtoms():
+        if fromAromatic == False:
+            # Check if atom is Aromatic
+            if atom.GetIsAromatic():
+                continue
             else:
                 AtomIdxs.append(atom.GetIdx())
-                if Verbose:
-                    print(f'Number of Bonds atom has = {len(atom.GetBonds())}')
-
-        #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
-        if len(AtomIdxs) == 0:
-            if Verbose:
-                print('Empty Atom Index List')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
-        
         else:
-            #Select a random atom from the index of potential replacement atoms
-            ReplaceAtomIdx = rnd(AtomIdxs)
-            #Exclude replaced atom type from list of atoms to do replacing with
-            ReplaceAtomType = StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()
-            AtomReplacements = [x for x in NewAtoms if x != ReplaceAtomType]
-
-            StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-
-            #Replace atom
-            ReplacementAtom = rnd(AtomReplacements)
-            StartingMolecule.ReplaceAtom(ReplaceAtomIdx, Chem.Atom(ReplacementAtom), preserveProps=True)
-
+            AtomIdxs.append(atom.GetIdx())
             if Verbose:
-                print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
-                replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
-            
-            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+                print(f'Number of Bonds atom has = {len(atom.GetBonds())}')
 
+    #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
+    if len(AtomIdxs) == 0:
+        if Verbose:
+            print('Empty Atom Index List')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+    
     else:
-        for atom in StartingMoleculeUnedited.GetAtoms():
-            if fromAromatic == False:
-                # Check if atom is Aromatic
-                if atom.GetIsAromatic():
-                    continue
-                else:
-                    AtomIdxs.append(atom.GetIdx())
-            else:
-                AtomIdxs.append(atom.GetIdx())
+        #Select a random atom from the index of potential replacement atoms
+        ReplaceAtomIdx = rnd(AtomIdxs)
+        #Exclude replaced atom type from list of atoms to do replacing with
+        ReplaceAtomType = StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()
+        AtomReplacements = [x for x in NewAtoms if x != ReplaceAtomType]
 
-        #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
-        if len(AtomIdxs) == 0:
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+
+        #Replace atom
+        ReplacementAtom = rnd(AtomReplacements)
+        StartingMolecule.ReplaceAtom(ReplaceAtomIdx, Chem.Atom(ReplacementAtom), preserveProps=True)
+
+        if Verbose:
+            print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
+            replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
         
-        else:
-            #Select a random atom from the index of potential replacement atoms
-            ReplaceAtomIdx = rnd(AtomIdxs)
-            #Exclude replaced atom type from list of atoms to do replacing with
-            ReplaceAtomType = StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()
-            AtomReplacements = [x for x in NewAtoms if x != ReplaceAtomType]
-
-            StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-
-            #Replace atom
-            ReplacementAtom = rnd(AtomReplacements)
-            StartingMolecule.ReplaceAtom(ReplaceAtomIdx, Chem.Atom(ReplacementAtom), preserveProps=True)
-
-            if Verbose:
-                print(f'{StartingMoleculeUnedited.GetAtomWithIdx(ReplaceAtomIdx).GetSymbol()}\
-                replaced with {Chem.Atom(ReplacementAtom).GetSymbol()}')
-            
-            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
@@ -425,7 +388,7 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
       
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
-def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True, Verbose=False):
+def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
     """
     Function to replace atom from a selected list of atoms from a starting molecule.
     
@@ -453,8 +416,7 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True, V
     # Check if starting molecule is completely aromatic
     for atom in StartingMoleculeUnedited.GetAtoms():
         if len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
-            if Verbose:
-                print('Starting molecule is completely aromatic')
+            print('Starting molecule is completely aromatic')
             Mut_Mol = None
             Mut_Mol_Sanitized = None
             MutMolSMILES = None
@@ -486,8 +448,7 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True, V
             
             #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
             if len(AtomIdxs) == 0:
-                if Verbose:
-                    print('Empty Atom Index List')
+                print('Empty Atom Index List')
                 Mut_Mol = None
                 Mut_Mol_Sanitized = None
                 MutMolSMILES = None
@@ -510,25 +471,21 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True, V
                     StartingMolecule.RemoveAtom(RemoveAtomIdx)
                     StartingMolecule.AddBond(RemoveAtomNeigbors[0].GetIdx(), RemoveAtomNeigbors[1].GetIdx(), rnd(BondTypes))
                 else:
-                    if Verbose:
-                        print('Removed atom has illegal number of neighbors')
+                    print('Removed atom has illegal number of neighbors')
                     Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
                 # Check number of heavy atoms before and after, should have reduced by one 
                 if StartingMoleculeUnedited.GetNumHeavyAtoms() == StartingMolecule.GetNumHeavyAtoms():
-                    if Verbose:
-                        print('Atom removal failed, returning empty object')
+                    print('Atom removal failed, returning empty object')
                     Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
                 # Check what atom was removed from where
-                if Verbose:
-                    print(f'{StartingMoleculeUnedited.GetAtomWithIdx(RemoveAtomIdx).GetSymbol()} removed from position {RemoveAtomIdx}')
+                print(f'{StartingMoleculeUnedited.GetAtomWithIdx(RemoveAtomIdx).GetSymbol()} removed from position {RemoveAtomIdx}')
 
                 Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
             
             else:
-                if Verbose:
-                    print('Atom removal failed, returning empty object')
+                print('Atom removal failed, returning empty object')
                 Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
             # except:
@@ -536,6 +493,8 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True, V
             #     Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
+
+
 
 #Change so that we can have at most 1 benzene molecule
 def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
