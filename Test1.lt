@@ -1,0 +1,189 @@
+import "oplsaa.lt"    # <-- defines the standard "OPLSAA" force field
+import "loplsaa.lt" 
+Test1 inherits OPLSAA {
+# atom-id  mol-id  atom-type charge      X         Y        Z
+  write('Data Atoms') {
+	$atom:C0	$mol	@atom:88	0	  -8.540	   1.719	  -3.147
+	$atom:C1	$mol	@atom:95	0	  -7.942	   2.122	  -2.054
+	$atom:C2	$mol	@atom:95	0	  -8.677	   2.215	  -0.797
+	$atom:C3	$mol	@atom:458	0	  -8.101	   2.604	   0.310
+	$atom:O4	$mol	@atom:122	0	  -6.793	   2.964	   0.474
+	$atom:C5	$mol	@atom:124	0	  -5.816	   2.052	   1.011
+	$atom:C6	$mol	@atom:124	0	  -5.658	   0.845	   0.153
+	$atom:O7	$mol	@atom:122	0	  -4.740	  -0.017	   0.698
+	$atom:C8	$mol	@atom:124	0	  -3.524	   0.574	   0.868
+	$atom:C9	$mol	@atom:81	0	  -2.520	  -0.439	   1.470
+	$atom:C10	$mol	@atom:124	0	  -1.241	   0.324	   1.651
+	$atom:O11	$mol	@atom:122	0	  -0.700	   0.808	   0.504
+	$atom:C12	$mol	@atom:124	0	  -0.290	  -0.155	  -0.418
+	$atom:C13	$mol	@atom:87	0	   0.713	  -1.070	   0.203
+	$atom:C14	$mol	@atom:87L	0	   1.923	  -1.141	  -0.335
+	$atom:C15	$mol	@atom:81L	0	   2.887	  -2.084	   0.342
+	$atom:C16	$mol	@atom:81L	0	   4.049	  -1.301	   0.848
+	$atom:C17	$mol	@atom:81L	0	   4.773	  -0.663	  -0.348
+	$atom:C18	$mol	@atom:87L	0	   5.912	   0.137	   0.151
+	$atom:C19	$mol	@atom:87L	0	   7.150	  -0.086	  -0.153
+	$atom:C20	$mol	@atom:81L	0	   7.731	  -1.130	  -1.023
+	$atom:C21	$mol	@atom:87	0	   8.677	  -1.993	  -0.222
+	$atom:C22	$mol	@atom:100	0	   8.850	  -1.765	   1.068
+	$atom:O23	$mol	@atom:96	0	   9.699	  -2.515	   1.860
+	$atom:H24	$mol	@atom:89	0	  -7.983	   1.659	  -4.067
+	$atom:H25	$mol	@atom:89	0	  -9.581	   1.453	  -3.118
+	$atom:H26	$mol	@atom:89	0	  -6.884	   2.388	  -2.113
+	$atom:H27	$mol	@atom:89	0	  -9.719	   1.952	  -0.793
+	$atom:H28	$mol	@atom:89	0	  -8.715	   2.656	   1.225
+	$atom:H29	$mol	@atom:127	0	  -4.875	   2.668	   1.048
+	$atom:H30	$mol	@atom:127	0	  -6.067	   1.751	   2.033
+	$atom:H31	$mol	@atom:127	0	  -5.276	   1.122	  -0.877
+	$atom:H32	$mol	@atom:127	0	  -6.615	   0.309	  -0.029
+	$atom:H33	$mol	@atom:127	0	  -3.071	   0.938	  -0.051
+	$atom:H34	$mol	@atom:127	0	  -3.543	   1.381	   1.644
+	$atom:H35	$mol	@atom:85	0	  -2.488	  -1.267	   0.765
+	$atom:H36	$mol	@atom:85	0	  -2.889	  -0.840	   2.429
+	$atom:H37	$mol	@atom:127	0	  -0.514	  -0.225	   2.298
+	$atom:H38	$mol	@atom:127	0	  -1.509	   1.224	   2.282
+	$atom:H39	$mol	@atom:127	0	   0.129	   0.272	  -1.337
+	$atom:H40	$mol	@atom:127	0	  -1.175	  -0.766	  -0.674
+	$atom:H41	$mol	@atom:89	0	   0.489	  -1.675	   1.068
+	$atom:H42	$mol	@atom:89L	0	   2.189	  -0.567	  -1.200
+	$atom:H43	$mol	@atom:85LCH2	0	   3.181	  -2.852	  -0.409
+	$atom:H44	$mol	@atom:85LCH2	0	   2.376	  -2.658	   1.144
+	$atom:H45	$mol	@atom:85LCH2	0	   4.754	  -1.944	   1.408
+	$atom:H46	$mol	@atom:85LCH2	0	   3.730	  -0.444	   1.503
+	$atom:H47	$mol	@atom:85LCH2	0	   5.135	  -1.488	  -0.976
+	$atom:H48	$mol	@atom:85LCH2	0	   4.076	  -0.039	  -0.952
+	$atom:H49	$mol	@atom:89L	0	   5.650	   0.985	   0.837
+	$atom:H50	$mol	@atom:89L	0	   7.881	   0.632	   0.324
+	$atom:H51	$mol	@atom:85LCH2	0	   6.954	  -1.815	  -1.403
+	$atom:H52	$mol	@atom:85LCH2	0	   8.321	  -0.710	  -1.874
+	$atom:H53	$mol	@atom:89L	0	   9.214	  -2.794	  -0.694
+	$atom:H54	$mol	@atom:89	0	   8.312	  -0.959	   1.545
+	$atom:H55	$mol	@atom:97	0	  10.689	  -2.350	   1.857
+  }
+  write('Data Bond List') {
+	$bond:C0C1	$atom:C0	$atom:C1
+	$bond:C1C2	$atom:C1	$atom:C2
+	$bond:C2C3	$atom:C2	$atom:C3
+	$bond:C3O4	$atom:C3	$atom:O4
+	$bond:O4C5	$atom:O4	$atom:C5
+	$bond:C5C6	$atom:C5	$atom:C6
+	$bond:C6O7	$atom:C6	$atom:O7
+	$bond:O7C8	$atom:O7	$atom:C8
+	$bond:C8C9	$atom:C8	$atom:C9
+	$bond:C9C10	$atom:C9	$atom:C10
+	$bond:C10O11	$atom:C10	$atom:O11
+	$bond:O11C12	$atom:O11	$atom:C12
+	$bond:C12C13	$atom:C12	$atom:C13
+	$bond:C13C14	$atom:C13	$atom:C14
+	$bond:C14C15	$atom:C14	$atom:C15
+	$bond:C15C16	$atom:C15	$atom:C16
+	$bond:C16C17	$atom:C16	$atom:C17
+	$bond:C17C18	$atom:C17	$atom:C18
+	$bond:C18C19	$atom:C18	$atom:C19
+	$bond:C19C20	$atom:C19	$atom:C20
+	$bond:C20C21	$atom:C20	$atom:C21
+	$bond:C21C22	$atom:C21	$atom:C22
+	$bond:C22O23	$atom:C22	$atom:O23
+	$bond:C0H24	$atom:C0	$atom:H24
+	$bond:C0H25	$atom:C0	$atom:H25
+	$bond:C1H26	$atom:C1	$atom:H26
+	$bond:C2H27	$atom:C2	$atom:H27
+	$bond:C3H28	$atom:C3	$atom:H28
+	$bond:C5H29	$atom:C5	$atom:H29
+	$bond:C5H30	$atom:C5	$atom:H30
+	$bond:C6H31	$atom:C6	$atom:H31
+	$bond:C6H32	$atom:C6	$atom:H32
+	$bond:C8H33	$atom:C8	$atom:H33
+	$bond:C8H34	$atom:C8	$atom:H34
+	$bond:C9H35	$atom:C9	$atom:H35
+	$bond:C9H36	$atom:C9	$atom:H36
+	$bond:C10H37	$atom:C10	$atom:H37
+	$bond:C10H38	$atom:C10	$atom:H38
+	$bond:C12H39	$atom:C12	$atom:H39
+	$bond:C12H40	$atom:C12	$atom:H40
+	$bond:C13H41	$atom:C13	$atom:H41
+	$bond:C14H42	$atom:C14	$atom:H42
+	$bond:C15H43	$atom:C15	$atom:H43
+	$bond:C15H44	$atom:C15	$atom:H44
+	$bond:C16H45	$atom:C16	$atom:H45
+	$bond:C16H46	$atom:C16	$atom:H46
+	$bond:C17H47	$atom:C17	$atom:H47
+	$bond:C17H48	$atom:C17	$atom:H48
+	$bond:C18H49	$atom:C18	$atom:H49
+	$bond:C19H50	$atom:C19	$atom:H50
+	$bond:C20H51	$atom:C20	$atom:H51
+	$bond:C20H52	$atom:C20	$atom:H52
+	$bond:C21H53	$atom:C21	$atom:H53
+	$bond:C22H54	$atom:C22	$atom:H54
+	$bond:O23H55	$atom:O23	$atom:H55
+  }
+} # Test1
+
+
+
+# Note: You don't need to supply the partial partial charges of the atoms.
+#       If you like, just fill the fourth column with zeros ("0.000").
+#       Moltemplate and LAMMPS will automatically assign the charge later
+# Given the current charge dictionary, the atoms will have the following charges:
+# Atom 0 is type @atom:88 with charge -0.23
+# Atom 1 is type @atom:95 with charge -0.115
+# Atom 2 is type @atom:95 with charge -0.115
+# Atom 3 is type @atom:458 with charge -0.03
+# Atom 4 is type @atom:122 with charge -0.4
+# Atom 5 is type @atom:124 with charge 0.14
+# Atom 6 is type @atom:124 with charge 0.14
+# Atom 7 is type @atom:122 with charge -0.4
+# Atom 8 is type @atom:124 with charge 0.14
+# Atom 9 is type @atom:81 with charge -0.12
+# Atom 10 is type @atom:124 with charge 0.14
+# Atom 11 is type @atom:122 with charge -0.4
+# Atom 12 is type @atom:124 with charge 0.14
+# Atom 13 is type @atom:87 with charge -0.115
+# Atom 14 is type @atom:87L with charge -0.16
+# Atom 15 is type @atom:81L with charge -0.148
+# Atom 16 is type @atom:81L with charge -0.148
+# Atom 17 is type @atom:81L with charge -0.148
+# Atom 18 is type @atom:87L with charge -0.16
+# Atom 19 is type @atom:87L with charge -0.16
+# Atom 20 is type @atom:81L with charge -0.148
+# Atom 21 is type @atom:87 with charge -0.115
+# Atom 22 is type @atom:100 with charge 0.205
+# Atom 23 is type @atom:96 with charge -0.683
+# Atom 24 is type @atom:89 with charge 0.115
+# Atom 25 is type @atom:89 with charge 0.115
+# Atom 26 is type @atom:89 with charge 0.115
+# Atom 27 is type @atom:89 with charge 0.115
+# Atom 28 is type @atom:89 with charge 0.115
+# Atom 29 is type @atom:127 with charge 0.03
+# Atom 30 is type @atom:127 with charge 0.03
+# Atom 31 is type @atom:127 with charge 0.03
+# Atom 32 is type @atom:127 with charge 0.03
+# Atom 33 is type @atom:127 with charge 0.03
+# Atom 34 is type @atom:127 with charge 0.03
+# Atom 35 is type @atom:85 with charge 0.06
+# Atom 36 is type @atom:85 with charge 0.06
+# Atom 37 is type @atom:127 with charge 0.03
+# Atom 38 is type @atom:127 with charge 0.03
+# Atom 39 is type @atom:127 with charge 0.03
+# Atom 40 is type @atom:127 with charge 0.03
+# Atom 41 is type @atom:89 with charge 0.115
+# Atom 42 is type @atom:89L with charge 0.16
+# Atom 43 is type @atom:85LCH2 with charge 0.074
+# Atom 44 is type @atom:85LCH2 with charge 0.074
+# Atom 45 is type @atom:85LCH2 with charge 0.074
+# Atom 46 is type @atom:85LCH2 with charge 0.074
+# Atom 47 is type @atom:85LCH2 with charge 0.074
+# Atom 48 is type @atom:85LCH2 with charge 0.074
+# Atom 49 is type @atom:89L with charge 0.16
+# Atom 50 is type @atom:89L with charge 0.16
+# Atom 51 is type @atom:85LCH2 with charge 0.074
+# Atom 52 is type @atom:85LCH2 with charge 0.074
+# Atom 53 is type @atom:89L with charge 0.16
+# Atom 54 is type @atom:89 with charge 0.115
+# Atom 55 is type @atom:97 with charge 0.418
+# The sum of the atomic charges is: -0.01
+
+            # WARNING: The net charge appears to be non-zero! This may indicate
+            incompatible atom types.
+            
+#-0.01500

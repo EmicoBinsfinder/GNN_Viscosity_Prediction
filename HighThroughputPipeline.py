@@ -50,6 +50,7 @@ import sys
 import Genetic_Algorithm_Functions as GAF
 import ast
 import shlex
+import os
 
 #import Genetic_Algorithm
 
@@ -64,18 +65,22 @@ if LOPLS:
 else:
     COMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -c'
 
-WORKINGDIR = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/Molecules/{Name}'
+STARTINGDIR = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/'
 
-GAF.runcmd(f'mkdir Molecules')
-GAF.runcmd(f'cd Molecules; mkdir {Name}; cd {Name}')
 
-# GAF.runcmd(f'mkdir {Name}')
-# GAF.runcmd(f'cd {Name}')
+GAF.runcmd(f'{PYTHONPATH} {COMMAND} > {Name}.lt')
 
-GAF.runcmd(f'{PYTHONPATH} {COMMAND} > {WORKINGDIR}/{Name}.lt')
-
-with open(f'{WORKINGDIR}/{Name}.lt', 'r') as file:
+with open(f'{os.getcwd()}/{Name}.lt', 'r') as file:
     data = file.readlines()
     charge = data[-1].split('#')[-1].split('\n')[0] #Horrendous way of getting the charge
 
 print(float(charge))
+
+GAF.runcmd(f'mkdir Molecules')
+os.chdir(os.path.join(STARTINGDIR, 'Molecules'))
+GAF.runcmd(f'mkdir {Name}')
+os.chdir(os.path.join(os.getcwd(), f'{Name}'))
+os.rename("path/to/current/file.foo", "path/to/new/destination/for/file.foo")
+GAF.runcmd(f'cp {Name}.lt {os.getcwd()}')
+
+

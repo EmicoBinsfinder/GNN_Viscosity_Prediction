@@ -157,18 +157,6 @@ while len(GeneratedMolecules) < GenerationSize:
 
     else:
         # Check if molecule can be parameterised with OPLS
-        try:
-            Name = 'Test1' # Name of the molecule that will be generated, will need to use this in system.lt file
-
-            if LOPLS:
-                LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -l -c'
-            else:
-               LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -c'
-            
-            GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {WORKINGDIR}/{Name}.lt')
-        except:
-            continue
-
         HeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
         MutMol = result[0]
         MutMolSMILES = result[2] # Get Mol object of mutated molecule
@@ -176,13 +164,34 @@ while len(GeneratedMolecules) < GenerationSize:
         Score = GAF.fitfunc(StartingMoleculeSMILES, 1) # Apply fitness function to candidate
         ID = counter
         counter +=1
+        
+        # try:
+        #     Name = f'Molecule_{}'
+        #     if LOPLS:
+        #         LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -l -c'
+        #     else:
+        #        LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -c'
             
-        # Add molecules to master list
-        GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, ID] 
+        #     GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {WORKINGDIR}/{Name}.lt')
 
-        # Initialise molecules for next generation
-        GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, ID]) 
-    
+        #     HeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
+        #     MutMol = result[0]
+        #     MutMolSMILES = result[2] # Get Mol object of mutated molecule
+        #     PreviousMolecule = result[3] # Get history of last two mutations performed on candidate
+        #     Score = GAF.fitfunc(StartingMoleculeSMILES, 1) # Apply fitness function to candidate
+        #     ID = counter
+        #     counter +=1
+                
+        #     # Add molecules to master list
+        #     GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, ID] 
+
+        #     # Initialise molecules for next generation
+        #     GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, ID])
+        
+        # except Exception as E:
+        #     print(E)
+        #     continue   
+ 
     FirstGenerationAttempts += 1
 
 ################################### Subsequent generations #################################################
