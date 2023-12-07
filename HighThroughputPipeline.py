@@ -67,20 +67,31 @@ else:
 
 STARTINGDIR = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/'
 
-
 GAF.runcmd(f'{PYTHONPATH} {COMMAND} > {Name}.lt')
 
-with open(f'{os.getcwd()}/{Name}.lt', 'r') as file:
-    data = file.readlines()
-    charge = data[-1].split('#')[-1].split('\n')[0] #Horrendous way of getting the charge
+def GetMolCharge(PATH):
+    """
+    Retreive molecule charge from Moltemplate file
+    """
 
+    with open(PATH, 'r') as file:
+        data = file.readlines()
+        charge = data[-1].split('#')[-1].split('\n')[0] #Horrendous way of getting the charge
+
+    return charge
+
+charge = GetMolCharge(f'{os.getcwd()}/{Name}.lt')
 print(float(charge))
 
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(STARTINGDIR, 'Molecules'))
 GAF.runcmd(f'mkdir {Name}')
 os.chdir(os.path.join(os.getcwd(), f'{Name}'))
-os.rename("path/to/current/file.foo", "path/to/new/destination/for/file.foo")
-GAF.runcmd(f'cp {Name}.lt {os.getcwd()}')
 
+if os.path.exists(f"{os.path.join(os.getcwd(), f'{Name}.lt')}"):
+    print('Specified file already exists in this location!')
+else:
+    os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.lt')}", f"{os.path.join(os.getcwd(), f'{Name}.lt')}")
+
+os.chdir(STARTINGDIR) # Return to starting directory
 

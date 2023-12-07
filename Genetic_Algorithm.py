@@ -84,13 +84,14 @@ from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
 from operator import itemgetter
 import Genetic_Algorithm_Functions as GAF
+import os
 
 DrawingOptions.includeAtomNumbers=True
 DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
-fragments = ['CCCC', 'CCCCC', 'CCCCCC', 'CCCCCCCC', 'CCCCCCC', 'c1ccccc1', 'CCCCCCCCC']
+fragments = ['CCCC', 'CCCCC', 'CCCCCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'c1ccccc1']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
 ### ATOM NUMBERS
@@ -121,9 +122,14 @@ GenerationMolecules = []
 MaxNumHeavyAtoms = 50
 showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
-LOPLS = True
+LOPLS = True # Whether or not to use OPLS or LOPLS, False uses OPLS
+
 PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
-WORKINGDIR = 'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/'
+STARTINGDIR = 'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/'
+GAF.runcmd(f'mkdir Molecules')
+os.chdir(os.path.join(os.getcwd(), 'Molecules'))
+GAF.runcmd(f'mkdir Generation_1')
+os.chdir(STARTINGDIR)
 
 # Initialise population 
 
@@ -133,7 +139,6 @@ while len(GeneratedMolecules) < GenerationSize:
     print(f'Attempt number: {FirstGenerationAttempts}')
     StartingMolecule = rnd(fragments) #Select starting molecule
     StartingMoleculeSMILES = Chem.MolToSmiles(StartingMolecule)
-    print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
 
     Mutation = rnd(Mutations)
     AromaticMolecule = fragments[-1]
@@ -151,7 +156,7 @@ while len(GeneratedMolecules) < GenerationSize:
         continue
 
     # Check if Candidate is too short
-    elif result[0].GetNumHeavyAtoms() < 3:
+    elif result[0].GetNumHeavyAtoms() < 5:
         print('Molecule too short')
         continue
 
@@ -163,152 +168,189 @@ while len(GeneratedMolecules) < GenerationSize:
         PreviousMolecule = result[3] # Get history of last two mutations performed on candidate
         Score = GAF.fitfunc(StartingMoleculeSMILES, 1) # Apply fitness function to candidate
         ID = counter
-        counter +=1
-        
-        # try:
-        #     Name = f'Molecule_{}'
-        #     if LOPLS:
-        #         LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -l -c'
-        #     else:
-        #        LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{smi}" -n {Name} -c'
+
+        try:
+            Name = f'Generation_1_Molecule_{ID}' # Set name of Molecule as its SMILES string
+
+            # Set feature definition file path to OPLS or LOPLS depending on user choice 
+            if LOPLS:
+                LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -l -c'
+            else:
+               LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -c'
             
-        #     GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {WORKINGDIR}/{Name}.lt')
+            #Attempt to parameterise with OPLS
+            GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
 
-        #     HeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
-        #     MutMol = result[0]
-        #     MutMolSMILES = result[2] # Get Mol object of mutated molecule
-        #     PreviousMolecule = result[3] # Get history of last two mutations performed on candidate
-        #     Score = GAF.fitfunc(StartingMoleculeSMILES, 1) # Apply fitness function to candidate
-        #     ID = counter
-        #     counter +=1
+            #Get molecule charge
+            charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
+            print(f'OPLS Molecule Charge is: {float(charge)}')
+
+            # Go into directory for this generation
+            os.chdir(os.path.join(STARTINGDIR, 'Molecules', 'Generation_1'))
+            
+            # Make a directory for the current molecule if it can be parameterised 
+            GAF.runcmd(f'mkdir {Name}')
+
+            # Enter molecule specific directory
+            os.chdir(os.path.join(os.getcwd(), f'{Name}'))
+
+            #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
+            if os.path.exists(f"{os.path.join(os.getcwd(), f'{Name}.lt')}"):
+                print('Specified file already exists in this location, removing generated file.')
+                os.remove(f'{STARTINGDIR}/{Name}.lt')
+            else:
+                os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.lt')}", f"{os.path.join(os.getcwd(), f'{Name}.lt')}")
+
+            # Return to starting directory
+            os.chdir(STARTINGDIR) 
                 
-        #     # Add molecules to master list
-        #     GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, ID] 
+            # Add molecules to master list
+            GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge] 
 
-        #     # Initialise molecules for next generation
-        #     GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, ID])
-        
-        # except Exception as E:
-        #     print(E)
-        #     continue   
+            # Initialise molecules for next generation
+            GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge])
+            print(f'Final Molecule SMILES: {MutMolSMILES}')
+            counter +=1
+
+        except Exception as E:
+            print(E)
+            continue   
  
     FirstGenerationAttempts += 1
 
 ################################### Subsequent generations #################################################
-MaxGenerations = 2 
+MaxGenerations = 3 
 NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
 
-# for generation in range(1, MaxGenerations):
-#     GenerationTotalAttempts = 0
+for generation in range(2, MaxGenerations):
+    GenerationTotalAttempts = 0
+    IDcounter = 1 # Counter for generating molecule IDs
 
-#     # Perform elitism selection
-#     ScoreSortedMolecules = sorted(GenerationMolecules, key=itemgetter(4), reverse=True)
+    # os.chdir(os.path.join(os.getcwd(), 'Molecules')) # Enter Molecules Directory
+    # GAF.runcmd(f'mkdir Generation_{generation}') # Make directory for current generation
+    # os.chdir(os.path.join(os.getcwd(), f'Generation_{generation}')) # Enter directory for current generation
 
-#     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
-#     GenerationMolecules = ScoreSortedMolecules[:NumElite]
+    # Perform elitism selection
+    ScoreSortedMolecules = sorted(GenerationMolecules, key=itemgetter(4), reverse=True)
 
-#     for i, entry in enumerate(GenerationMolecules):
-#         MutMol = None
-#         attempts = 0
+    # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
+    GenerationMolecules = ScoreSortedMolecules[:NumElite]
+    UnmutatedMolecules = deepcopy(GenerationMolecules) 
 
-#         # Stop appending mutate
-#         if len(GenerationMolecules) == GenerationSize:
-#             break
+    for i, entry in enumerate(GenerationMolecules): #Start by mutating best performing molecules from previous generation and work down
+        MutMol = None
+        attempts = 0
 
-#         # Attempt mutation on each molecule, not moving on until a valid mutation has been suggested
-#         while MutMol == None:
-#             attempts += 1
-#             GenerationTotalAttempts += 1
+        # Stop appending mutated molecules
+        if len(GenerationMolecules) == GenerationSize:
+            print(len(GenerationMolecules))
+            break
 
-#             # Limit number of attempts at mutation, if max attempts exceeded, break loop to attempt on next molecule
-#             if attempts >= MaxMutationAttempts:
-#                 #print('Max Attempts Exceeded, molecule cannot evolve further')
-#                 Fails += 1 
-#                 break
+        # Attempt mutation on each molecule, not moving on until a valid mutation has been suggested
+        while MutMol == None:
+            attempts += 1
+            GenerationTotalAttempts += 1
 
-#             # Starting molecule SMILES string
-#             StartingMoleculeSMILES = entry[0]
+            # Limit number of attempts at mutation, if max attempts exceeded, break loop to attempt on next molecule
+            if attempts >= MaxMutationAttempts:
+                #print('Max Attempts Exceeded, molecule cannot evolve further')
+                Fails += 1 
+                break
+
+            # Starting molecule SMILES string
+            StartingMoleculeSMILES = entry[0]
             
-#             # Starting Molecule mol object
-#             StartingMolecule = entry[1]
+            # Starting Molecule mol object
+            StartingMolecule = entry[1]
             
-#             # List containing last two successful mutations performed on molecule
-#             PreviousMutations = entry[2]
+            # List containing last two successful mutations performed on molecule
+            PreviousMutations = entry[2]
             
-#             # Number of heavy atoms
-#             NumHeavyAtoms = entry[3]
+            # Number of heavy atoms
+            NumHeavyAtoms = entry[3]
 
-#             # Molecule ID
-#             ID = entry[5]
+            # Molecule ID
+            ID = f'Generation_{generation}_Molecule_{IDcounter}'
 
-#             if NumHeavyAtoms > 42:
-#                 MutationList = ['RemoveAtom']
-#             else:
-#                 MutationList = Mutations 
+            if NumHeavyAtoms > 42:
+                MutationList = ['RemoveAtom']
+            else:
+                MutationList = Mutations 
             
-#             print(f'\n#################################################################\nNumber of attempts: {attempts}')
-#             print(f'Total Mutation Attempts: {GenerationTotalAttempts}')
-#             print(f'GENERATION: {generation}')
-#             print(f'Number of Heavy Atoms before mutation: {NumHeavyAtoms}')
+            print(f'\n#################################################################\nNumber of attempts: {attempts}')
+            print(f'Total Mutation Attempts: {GenerationTotalAttempts}')
+            print(f'GENERATION: {generation}')
+            print(f'Number of Heavy Atoms before mutation: {NumHeavyAtoms}')
 
-#             # Randomly select a mutation, here is where we can set mutation probabilities
-#             Mutation = rnd(MutationList)
+            # Randomly select a mutation, here is where we can set mutation probabilities
+            Mutation = rnd(MutationList)
 
-#             # Initialise Aromatic Ring
-#             AromaticMolecule = fragments[-1]
+            # Initialise Aromatic Ring
+            AromaticMolecule = fragments[-1]
 
-#             print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
+            #print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
 
-#             #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
-#             result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
+            #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
+            result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
             
-#             # Calculate performance based on SMILES string of generated 
-#             Score = GAF.fitfunc(result[2], generation)
-#             print(Score)
+            # Calculate performance based on SMILES string of generated 
+            Score = GAF.fitfunc(result[2], generation) #Placehholder score
+            print(Score)
 
-#             # Check for null results or fragmented molecules
-#             if result[0] == None or len(Chem.GetMolFrags(result[0])) > 1:
-#                 MutMol = None
+            # Check for null results or fragmented molecules
+            if result[0] == None or len(Chem.GetMolFrags(result[0])) > 1:
+                MutMol = None
 
-#             # Check if candidate has already been generated by checking if SMILES string is in master list
-#             elif result[2] in GeneratedMolecules.keys():
-#                 print('Molecule previously generated')
-#                 MutMol = None
+            # Check if candidate has already been generated by checking if SMILES string is in master list
+            elif result[2] in GeneratedMolecules.keys():
+                print('Molecule previously generated')
+                MutMol = None
 
-#             # Limit number of heavy atoms in generated candidates
-#             elif NumHeavyAtoms > MaxNumHeavyAtoms:
-#                 print('Molecule has too many heavy atoms')
-#                 MutMol = None
+            # Limit number of heavy atoms in generated candidates
+            elif NumHeavyAtoms > MaxNumHeavyAtoms:
+                print('Molecule has too many heavy atoms')
+                MutMol = None
 
-#             # Check for molecules that are too short
-#             elif result[0].GetNumHeavyAtoms() < 3:
-#                 print('Molecule too short')
-#                 MutMol = None
+            # Check for molecules that are too short
+            elif result[0].GetNumHeavyAtoms() < 3:
+                print('Molecule too short')
+                MutMol = None
 
-#             # Check for illegal substructures
-#             elif GAF.CheckSubstruct(result[0]):
-#                 MutMol = None
+            # Check for illegal substructures
+            elif GAF.CheckSubstruct(result[0]):
+                MutMol = None
         
-#             else:
-#                 MutMol = result[0]
-#                 NumHeavyAtoms = result[0].GetNumHeavyAtoms()
-#                 print(f'Number of Heavy Atoms after mutation: {NumHeavyAtoms}')                
+            else:
+                MutMol = result[0]
+                NumHeavyAtoms = result[0].GetNumHeavyAtoms()
+                print(f'Number of Heavy Atoms after mutation: {NumHeavyAtoms}')                
 
-#                 # Update previous mutations object
-#                 PreviousMutations.pop(0)
-#                 PreviousMutations.append(Mutation)
+                # Update previous mutations object
+                PreviousMutations.pop(0)
+                PreviousMutations.append(Mutation)
 
-#                 # Add candidate and it's data to master list
-#                 GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
-#                                                     Score, ID]
+                # Add candidate and it's data to master list
+                GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
+                                                    Score, ID]
 
-#                 # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
-#                 # being overwritten
-#                 GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
-#                                         Score, ID])
+                # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
+                # being overwritten
+                GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
+                                        Score, ID])
+                
+                IDcounter += 1
 
-print(Fails)
-print(len(GeneratedMolecules))
-print(len(GenerationMolecules))
+    # Tasks to perform at end of every generation
+    # Simulate molecules that haven't been yet been simulated
+    MasterMolList = list(GeneratedMolecules.keys()) #List of all valid molecules generated
+    GenerationMols = [x[0] for x in GenerationMolecules] #List of molecules generated in this generation
+
+    SimMols = [x for x in MasterMolList if x not in GenerationMols] #List of molecules not yet simulated
+
+    print(SimMols)
+    print(len(SimMols))
+    print(GenerationMolecules)
+
+print(f'Number of failed mutations: {Fails}')
