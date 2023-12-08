@@ -229,16 +229,11 @@ for generation in range(2, MaxGenerations):
     GenerationTotalAttempts = 0
     IDcounter = 1 # Counter for generating molecule IDs
 
-    # os.chdir(os.path.join(os.getcwd(), 'Molecules')) # Enter Molecules Directory
-    # GAF.runcmd(f'mkdir Generation_{generation}') # Make directory for current generation
-    # os.chdir(os.path.join(os.getcwd(), f'Generation_{generation}')) # Enter directory for current generation
-
     # Perform elitism selection
     ScoreSortedMolecules = sorted(GenerationMolecules, key=itemgetter(4), reverse=True)
 
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
     GenerationMolecules = ScoreSortedMolecules[:NumElite]
-    #UnmutatedMolecules = deepcopy(GenerationMolecules)
     os.chdir(os.path.join(os.getcwd(), 'Molecules')) 
     GAF.runcmd(f'mkdir Generation_{generation}')
     os.chdir(STARTINGDIR)
@@ -259,7 +254,6 @@ for generation in range(2, MaxGenerations):
 
             # Limit number of attempts at mutation, if max attempts exceeded, break loop to attempt on next molecule
             if attempts >= MaxMutationAttempts:
-                #print('Max Attempts Exceeded, molecule cannot evolve further')
                 Fails += 1 
                 break
 
@@ -292,8 +286,6 @@ for generation in range(2, MaxGenerations):
 
             # Initialise Aromatic Ring
             AromaticMolecule = fragments[-1]
-
-            #print(f'Starting Molecule SMILES: {StartingMoleculeSMILES}')
 
             #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
             result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
@@ -386,3 +378,14 @@ for generation in range(2, MaxGenerations):
     # # Simulate molecules that haven't been yet been simulated
 
 print(f'Number of failed mutations: {Fails}')
+
+
+#/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/packmol < input.inp
+
+#export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"
+
+#moltemplate.sh -atomstyle full -pdb Kajita1.pdb system.lt
+
+#export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"
+
+#moltemplate.sh -pdb hex.pdb system.lt

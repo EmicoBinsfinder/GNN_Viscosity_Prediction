@@ -742,6 +742,3 @@ def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
         os.remove(f'{STARTINGDIR}/{Name}.{FileType}')
     else:
         os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
-
-# GAF.GeneratePDB(MutMolSMILES, PATH=os.path.join(STARTINGDIR, f'{Name}.pdb'))
-# GAF.CheckMoveFile(Name, STARTINGDIR, '.lt', CWD)
