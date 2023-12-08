@@ -15,6 +15,7 @@ from operator import itemgetter
 import subprocess
 import ast
 import requests
+import os
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
     
@@ -494,8 +495,6 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
-
-
 #Change so that we can have at most 1 benzene molecule
 def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
 
@@ -691,7 +690,7 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
     
     return process
 
-def GeneratePDB(SMILES, PATH, CONFORMATTEMPTS):
+def GeneratePDB(SMILES, PATH, CONFORMATTEMPTS=10):
 
     """
     Function that generates PDB file from RDKit Mol object, for use with Packmol
@@ -708,7 +707,7 @@ def GeneratePDB(SMILES, PATH, CONFORMATTEMPTS):
     # Initial parameters for conformer optimisation
     MMFFSMILES = 1 
     ConformAttempts = 1
-    MaxConformAttempts = 10
+    MaxConformAttempts = CONFORMATTEMPTS
 
     # Ensure that script continues to iterate until acceptable conformation found
     while MMFFSMILES !=0 and ConformAttempts <= MaxConformAttempts: # Checking if molecule converged
@@ -736,3 +735,13 @@ def smiles_to_iupac(smiles):
     response = requests.get(url)
     response.raise_for_status()
     return response.text
+
+def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
+    if os.path.exists(f"{os.path.join(CWD, f'{Name}.{FileType}')}"):
+        print('Specified file already exists in this location, removing generated file.')
+        os.remove(f'{STARTINGDIR}/{Name}.{FileType}')
+    else:
+        os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
+
+# GAF.GeneratePDB(MutMolSMILES, PATH=os.path.join(STARTINGDIR, f'{Name}.pdb'))
+# GAF.CheckMoveFile(Name, STARTINGDIR, '.lt', CWD)

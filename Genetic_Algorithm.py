@@ -125,7 +125,8 @@ GenerationSize = 50
 LOPLS = True # Whether or not to use OPLS or LOPLS, False uses OPLS
 
 PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
-STARTINGDIR = 'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/'
+STARTINGDIR = os.getcwd()
+#PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -174,9 +175,9 @@ while len(GeneratedMolecules) < GenerationSize:
 
             # Set feature definition file path to OPLS or LOPLS depending on user choice 
             if LOPLS:
-                LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -l -c'
+                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
             else:
-               LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -c'
+                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
             
             #Attempt to parameterise with OPLS
             GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -184,6 +185,9 @@ while len(GeneratedMolecules) < GenerationSize:
             #Get molecule charge
             charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
             print(f'OPLS Molecule Charge is: {float(charge)}')
+
+            #If successful, generate a PDB of molecule to use with Packmol
+            GAF.GeneratePDB(MutMolSMILES, PATH=os.path.join(STARTINGDIR, f'{Name}.pdb'))
 
             # Go into directory for this generation
             os.chdir(os.path.join(STARTINGDIR, 'Molecules', 'Generation_1'))
@@ -195,11 +199,9 @@ while len(GeneratedMolecules) < GenerationSize:
             os.chdir(os.path.join(os.getcwd(), f'{Name}'))
 
             #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
-            if os.path.exists(f"{os.path.join(os.getcwd(), f'{Name}.lt')}"):
-                print('Specified file already exists in this location, removing generated file.')
-                os.remove(f'{STARTINGDIR}/{Name}.lt')
-            else:
-                os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.lt')}", f"{os.path.join(os.getcwd(), f'{Name}.lt')}")
+            CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
+            GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
+            GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
             # Return to starting directory
             os.chdir(STARTINGDIR) 
@@ -213,7 +215,6 @@ while len(GeneratedMolecules) < GenerationSize:
             counter +=1
 
         except Exception as E:
-            print(E)
             continue   
  
     FirstGenerationAttempts += 1
@@ -336,9 +337,9 @@ for generation in range(2, MaxGenerations):
 
                     # Set feature definition file path to OPLS or LOPLS depending on user choice 
                     if LOPLS:
-                        LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -l -c'
+                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
                     else:
-                        LTCOMMAND = f'c:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/rdlt.py --smi "{MutMolSMILES}" -n {Name} -c'
+                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
                     
                     #Attempt to parameterise with OPLS
                     GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -346,6 +347,9 @@ for generation in range(2, MaxGenerations):
                     #Get molecule charge
                     charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
                     print(f'OPLS Molecule Charge is: {float(charge)}')
+
+                    #If successful, generate a PDB of molecule to use with Packmol
+                    GAF.GeneratePDB(MutMolSMILES, PATH=os.path.join(STARTINGDIR, f'{Name}.pdb'))
 
                     # Go into directory for this generation
                     os.chdir(os.path.join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
@@ -357,11 +361,9 @@ for generation in range(2, MaxGenerations):
                     os.chdir(os.path.join(os.getcwd(), f'{Name}'))
 
                     #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
-                    if os.path.exists(f"{os.path.join(os.getcwd(), f'{Name}.lt')}"):
-                        print('Specified file already exists in this location, removing generated file.')
-                        os.remove(f'{STARTINGDIR}/{Name}.lt')
-                    else:
-                        os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.lt')}", f"{os.path.join(os.getcwd(), f'{Name}.lt')}")
+                    CWD = os.getcwd()
+                    GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
+                    GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
@@ -378,7 +380,6 @@ for generation in range(2, MaxGenerations):
                     IDcounter += 1
                     
                 except Exception as E:
-                    print(E)
                     continue   
 
     # # Tasks to perform at end of every generation
