@@ -67,6 +67,14 @@ gaseous lubricants)
 Look at COMPASS 3
 """
 
+############### ENVIRONMENT SETUP ############
+import Genetic_Algorithm_Functions as GAF
+GAF.runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
+GAF.runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
+
+GAF.runcmd('module load anaconda3/personal')
+GAF.runcmd('source activate HTVS')
+
 ################# IMPORTS ###################
 
 from rdkit import Chem
@@ -83,7 +91,6 @@ from rdkit.Chem.Draw import rdMolDraw2D
 from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
 from operator import itemgetter
-import Genetic_Algorithm_Functions as GAF
 import os
 
 DrawingOptions.includeAtomNumbers=True
@@ -381,6 +388,14 @@ print(f'Number of failed mutations: {Fails}')
 
 
 #/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/packmol < input.inp
+
+"""
+Everything needed to get packmol working:
+
+- packmol input file
+
+"""
+
 
 #export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"
 
