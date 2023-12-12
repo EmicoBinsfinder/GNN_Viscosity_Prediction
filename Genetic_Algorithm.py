@@ -68,7 +68,6 @@ Look at COMPASS 3
 """
 
 ############### ENVIRONMENT SETUP ############
-
 import subprocess
 def runcmd(cmd, verbose = False, *args, **kwargs):
     #bascially allows python to run a bash command, and the code makes sure 
@@ -80,11 +79,12 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
     
     return process
 
+runcmd('module load anaconda3/personal')
+runcmd('source activate HTVS')
+
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
 
-runcmd('module load anaconda3/personal')
-runcmd('source activate HTVS')
 
 ################# IMPORTS ###################
 import Genetic_Algorithm_Functions as GAF
