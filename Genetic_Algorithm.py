@@ -79,12 +79,14 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
     
     return process
 
+
 runcmd('module load anaconda3/personal')
 runcmd('source activate HTVS')
 
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
 
+runcmd('export PATH=="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
 
 ################# IMPORTS ###################
 import Genetic_Algorithm_Functions as GAF
@@ -143,7 +145,7 @@ GenerationSize = 50
 LOPLS = True # Whether or not to use OPLS or LOPLS, False uses OPLS
 
 PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
-STARTINGDIR = os.getcwd()
+STARTINGDIR = deepcopy(os.getcwd())
 #PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
@@ -221,6 +223,16 @@ while len(GeneratedMolecules) < GenerationSize:
             GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
             GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
+            # Make packmol files
+            GAF.MakePackmolFile(Name, CWD)
+
+            if PYTHONPATH == 'python3':
+                GAF.runcmd('packmol < input.inp')
+
+            # Make Datafiles with Moltemplate
+
+            # Make LAMMPS datafiles
+
             # Return to starting directory
             os.chdir(STARTINGDIR) 
                 
@@ -233,6 +245,7 @@ while len(GeneratedMolecules) < GenerationSize:
             counter +=1
 
         except Exception as E:
+            print(E)
             continue   
  
     FirstGenerationAttempts += 1
@@ -342,7 +355,7 @@ for generation in range(2, MaxGenerations):
 
                 print(f'Final SMILES: {result[2]}')
 
-                try:
+                try: # Try to generate all necessary files to simulate molecule
                     Name = f'{ID}' # Set name of Molecule as its SMILES string
 
                     # Set feature definition file path to OPLS or LOPLS depending on user choice 
@@ -375,22 +388,27 @@ for generation in range(2, MaxGenerations):
                     GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
                     GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
+                    #Create packmol input file
+                    GAF.MakePackmolFile(Name, CWD)                                
+
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
-
-                    # Add candidate and it's data to master list
-                    GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
-                                                        Score, ID]
-
-                    # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
-                    # being overwritten
-                    GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
-                                            Score, ID])
-                    
-                    IDcounter += 1
-                    
+                  
                 except Exception as E:
+                    print(E)
                     continue   
+
+                # Add candidate and it's data to master list
+                GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
+                                                    Score, ID]
+
+
+                # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
+                # being overwritten
+                GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
+                                        Score, ID])
+                
+                IDcounter += 1
 
     # # Tasks to perform at end of every generation
     # # Simulate molecules that haven't been yet been simulated
@@ -408,10 +426,8 @@ Everything needed to get packmol working:
 """
 
 
-#export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"
 
 #moltemplate.sh -atomstyle full -pdb Kajita1.pdb system.lt
 
-#export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"
 
 #moltemplate.sh -pdb hex.pdb system.lt

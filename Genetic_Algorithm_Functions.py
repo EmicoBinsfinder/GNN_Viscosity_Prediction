@@ -742,3 +742,22 @@ def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
         os.remove(f'{STARTINGDIR}/{Name}.{FileType}')
     else:
         os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
+
+def MakePackmolFile(Name, CWD):
+    if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):
+        print('Specified file already exists in this location, removing generated file.')
+    else:
+        with open(os.path.join(CWD, f'{Name}.inp'), 'x') as file:
+            file.write(f"""
+tolerance 2.0
+output {Name}_PackmolFile.pdb
+
+filetype pdb
+
+structure {Name}.pdb
+number 50 
+inside cube 0. 0. 0. 50.
+end structure""")
+
+
+       
