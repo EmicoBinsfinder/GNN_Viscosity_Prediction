@@ -86,7 +86,7 @@ runcmd('source activate HTVS')
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
 
-runcmd('export PATH=="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
+runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
 
 ################# IMPORTS ###################
 import Genetic_Algorithm_Functions as GAF
@@ -226,8 +226,12 @@ while len(GeneratedMolecules) < GenerationSize:
             # Make packmol files
             GAF.MakePackmolFile(Name, CWD)
 
+            # Make Moltemplate files
+            GAF.MakeMoltemplateFile(Name, CWD)
+
             if PYTHONPATH == 'python3':
-                GAF.runcmd('packmol < input.inp')
+                GAF.runcmd(f'packmol < {Name}.inp')
+                GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')
 
             # Make Datafiles with Moltemplate
 
@@ -388,8 +392,15 @@ for generation in range(2, MaxGenerations):
                     GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
                     GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
-                    #Create packmol input file
-                    GAF.MakePackmolFile(Name, CWD)                                
+                    # Make packmol files
+                    GAF.MakePackmolFile(Name, CWD)
+
+                    # Make Moltemplate files
+                    GAF.MakeMoltemplateFile(Name, CWD)
+
+                    if PYTHONPATH == 'python3':
+                        GAF.runcmd(f'packmol < {Name}.inp')
+                        GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')                             
 
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
@@ -402,7 +413,6 @@ for generation in range(2, MaxGenerations):
                 GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
                                                     Score, ID]
 
-
                 # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
                 # being overwritten
                 GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
@@ -414,20 +424,3 @@ for generation in range(2, MaxGenerations):
     # # Simulate molecules that haven't been yet been simulated
 
 print(f'Number of failed mutations: {Fails}')
-
-
-#/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/packmol < input.inp
-
-"""
-Everything needed to get packmol working:
-
-- packmol input file
-
-"""
-
-
-
-#moltemplate.sh -atomstyle full -pdb Kajita1.pdb system.lt
-
-
-#moltemplate.sh -pdb hex.pdb system.lt

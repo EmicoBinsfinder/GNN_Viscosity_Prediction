@@ -759,5 +759,21 @@ number 50
 inside cube 0. 0. 0. 50.
 end structure""")
 
+def MakeMoltemplateFile(Name, CWD):
+    if os.path.exists(f"{os.path.join(CWD, f'{Name}._system.lt')}"):
+        print('Specified file already exists in this location, removing generated file.')
+    else:
+        with open(os.path.join(CWD, f'{Name}_system.lt'), 'x') as file:
+                    file.write(f"""
+import "{Name}.lt"  # <- defines the molecule type.
 
-       
+# Periodic boundary conditions:
+write_once("Data Boundary") {{
+   0.0  50.00  xlo xhi
+   0.0  50.00  ylo yhi
+   0.0  50.00  zlo zhi
+}}
+
+ethylenes = new {Name} [50]
+
+""")
