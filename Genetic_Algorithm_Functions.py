@@ -738,14 +738,14 @@ def smiles_to_iupac(smiles):
 
 def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.{FileType}')}"):
-        print('Specified file already exists in this location, removing generated file.')
+        print(f'Specified {FileType} file already exists in this location, removing generated file.')
         os.remove(f'{STARTINGDIR}/{Name}.{FileType}')
     else:
         os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
 
 def MakePackmolFile(Name, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):
-        print('Specified file already exists in this location, removing generated file.')
+        print('Packmol file already exists in this location, removing generated file.')
     else:
         with open(os.path.join(CWD, f'{Name}.inp'), 'x') as file:
             file.write(f"""
@@ -760,7 +760,7 @@ inside cube 0. 0. 0. 50.
 end structure""")
 
 def MakeMoltemplateFile(Name, CWD):
-    if os.path.exists(f"{os.path.join(CWD, f'{Name}._system.lt')}"):
+    if os.path.exists(f"{os.path.join(CWD, f'{Name}_system.lt')}"):
         print('Specified file already exists in this location, removing generated file.')
     else:
         with open(os.path.join(CWD, f'{Name}_system.lt'), 'x') as file:
@@ -777,3 +777,4 @@ write_once("Data Boundary") {{
 ethylenes = new {Name} [50]
 
 """)
+    

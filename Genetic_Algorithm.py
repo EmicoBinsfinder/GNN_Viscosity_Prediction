@@ -100,6 +100,7 @@ from rdkit.Chem import rdFMCS
 from rdkit.Chem.Draw import rdDepictor
 from random import choice as rnd
 import random
+import sys
 from rdkit.Chem.Draw import rdMolDraw2D
 from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
@@ -233,9 +234,8 @@ while len(GeneratedMolecules) < GenerationSize:
                 GAF.runcmd(f'packmol < {Name}.inp')
                 GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')
 
-            # Make Datafiles with Moltemplate
-
-            # Make LAMMPS datafiles
+            files = [f for f in os.listdir(CWD)]
+            print(files)
 
             # Return to starting directory
             os.chdir(STARTINGDIR) 
@@ -250,6 +250,7 @@ while len(GeneratedMolecules) < GenerationSize:
 
         except Exception as E:
             print(E)
+            sys.exit()
             continue   
  
     FirstGenerationAttempts += 1
@@ -399,14 +400,20 @@ for generation in range(2, MaxGenerations):
                     GAF.MakeMoltemplateFile(Name, CWD)
 
                     if PYTHONPATH == 'python3':
-                        GAF.runcmd(f'packmol < {Name}.inp')
-                        GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')                             
+                        GAF.runcmd(f'packmol < {Name}.inp') # Run packmol in command line
+                        GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt') # Run moltemplate in command line
+
+                    
+
+                    files = [f for f in os.listdir(CWD) if os.path.isfile(f)]
+                    print(files)
 
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
                   
                 except Exception as E:
                     print(E)
+                    sys.exit()
                     continue   
 
                 # Add candidate and it's data to master list
