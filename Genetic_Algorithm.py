@@ -79,7 +79,6 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
     
     return process
 
-
 runcmd('module load anaconda3/personal')
 runcmd('source activate HTVS')
 
@@ -145,9 +144,9 @@ showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
 LOPLS = True # Whether or not to use OPLS or LOPLS, False uses OPLS
 
-PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
+#PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-#PYTHONPATH = 'python3'
+PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -234,8 +233,11 @@ while len(GeneratedMolecules) < GenerationSize:
                 GAF.runcmd(f'packmol < {Name}.inp')
                 GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')
 
-            files = [f for f in os.listdir(CWD)]
-            print(files)
+            # Check that Moltemplate has generated all necessary files 
+            assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.settings')), 'Settings file not generated'                 
+            assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
+            assert os.path.exists(os.path.join(CWD, f'{Name}_system.data')), 'Data file not generated'                    
+            assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.init')), 'Init file not generated'                
 
             # Return to starting directory
             os.chdir(STARTINGDIR) 
@@ -250,7 +252,8 @@ while len(GeneratedMolecules) < GenerationSize:
 
         except Exception as E:
             print(E)
-            sys.exit()
+            if type(E) == AssertionError:
+                sys.exit()
             continue   
  
     FirstGenerationAttempts += 1
@@ -403,17 +406,19 @@ for generation in range(2, MaxGenerations):
                         GAF.runcmd(f'packmol < {Name}.inp') # Run packmol in command line
                         GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt') # Run moltemplate in command line
 
-                    
-
-                    files = [f for f in os.listdir(CWD) if os.path.isfile(f)]
-                    print(files)
+                    # Check that Moltemplate has generated all necessary files 
+                    assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.settings')), 'Settings file not generated'                 
+                    assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
+                    assert os.path.exists(os.path.join(CWD, f'{Name}_system.data')), 'Data file not generated'                    
+                    assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.init')), 'Init file not generated'                
 
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
                   
                 except Exception as E:
                     print(E)
-                    sys.exit()
+                    if type(E) == AssertionError:
+                        sys.exit()
                     continue   
 
                 # Add candidate and it's data to master list
