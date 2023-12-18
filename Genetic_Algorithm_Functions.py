@@ -740,8 +740,8 @@ def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.{FileType}')}"):
         print(f'Specified {FileType} file already exists in this location, overwriting')
         os.remove(f"{os.path.join(CWD, f'{Name}.{FileType}')}")
-    
-    os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
+    else:
+        os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
 
 def MakePackmolFile(Name, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):

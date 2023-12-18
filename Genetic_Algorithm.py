@@ -111,7 +111,7 @@ DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
-fragments = ['CCCC', 'CCCCC', 'CCCCCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'c1ccccc1']
+fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'c1ccccc1', 'CCCCCC', 'C(CCCCC)C']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
 ### ATOM NUMBERS
@@ -155,6 +155,8 @@ os.chdir(STARTINGDIR)
 # Initialise population 
 
 while len(GeneratedMolecules) < GenerationSize:
+    # Return to starting directory
+    os.chdir(STARTINGDIR)
 
     print('\n###########################################################')
     print(f'Attempt number: {FirstGenerationAttempts}')
@@ -238,10 +240,7 @@ while len(GeneratedMolecules) < GenerationSize:
             assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
             assert os.path.exists(os.path.join(CWD, f'{Name}_system.data')), 'Data file not generated'                    
             assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.init')), 'Init file not generated'                
-
-            # Return to starting directory
-            os.chdir(STARTINGDIR) 
-                
+               
             # Add molecules to master list
             GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge] 
 
@@ -252,8 +251,8 @@ while len(GeneratedMolecules) < GenerationSize:
 
         except Exception as E:
             print(E)
-            if type(E) == AssertionError:
-                sys.exit()
+            #if type(E) == AssertionError:
+            #    sys.exit()
             continue   
  
     FirstGenerationAttempts += 1
@@ -271,6 +270,7 @@ for generation in range(2, MaxGenerations):
     # Perform elitism selection
     ScoreSortedMolecules = sorted(GenerationMolecules, key=itemgetter(4), reverse=True)
 
+    os.chdir(STARTINGDIR)
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
     GenerationMolecules = ScoreSortedMolecules[:NumElite]
     os.chdir(os.path.join(os.getcwd(), 'Molecules')) 
@@ -372,6 +372,9 @@ for generation in range(2, MaxGenerations):
                     else:
                         LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
                     
+                    # Return to starting directory
+                    os.chdir(STARTINGDIR) 
+                    
                     #Attempt to parameterise with OPLS
                     GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
 
@@ -417,8 +420,8 @@ for generation in range(2, MaxGenerations):
                   
                 except Exception as E:
                     print(E)
-                    if type(E) == AssertionError:
-                        sys.exit()
+                    # if type(E) == AssertionError:
+                    #     sys.exit()
                     continue   
 
                 # Add candidate and it's data to master list
