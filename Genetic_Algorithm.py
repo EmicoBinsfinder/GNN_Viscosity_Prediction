@@ -28,11 +28,10 @@ Possible Mutations
 - Add Fragment 
 - Delete atom
 - Replace Fragment
-- Add Branch
 
 CONSIDERATIONS
 
-- Should mutations only happen to the best x molecules or any of the molecules
+- How to initialise and change population of fragments for remove fragments module
 
 - Maybe a way to store the history of mutations made to a molecule, so that we can adjust (reduce) probabilities of certain
 mutations occurring and reoccuring based on past events, increasing range of molecules chekced out.
@@ -51,14 +50,12 @@ visosity/conductivity to determine which modifications are best
 - How to implement a validity check before evaluating the fitness of molecules in a generation and which validity checks
 to implement
 
-- Can the molecule be parameterised?
+- How to replace
 
 - How to ensure that we are actually generating molecules that will be liquid at room temperature (how do we design 
 gaseous lubricants)
 
 - Need to decide best fingerprint for calculating molecular similarity
-
-- Need a parameter for elitism
 
 - Make calls to initialise LAMMPS call and get viscosity value from the simulation
 
@@ -76,32 +73,35 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
         cmd,
         text=True,
         shell=True)
+    
     return process
 
-runcmd('module load anaconda3/personal')
-runcmd('source activate HTVS')
-runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
-runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
-runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
+# runcmd('module load anaconda3/personal')
+# runcmd('source activate HTVS')
+
+# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
+# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
+
+# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
 
 ################# IMPORTS ###################
 import Genetic_Algorithm_Functions as GAF
 from rdkit import Chem
 from rdkit.Chem import Draw
-import rdkit
 from random import sample
 from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import MolDrawing, DrawingOptions
 from rdkit.Chem import rdFMCS
 from rdkit.Chem.Draw import rdDepictor
 from random import choice as rnd
-import random
 import sys
 from rdkit.Chem.Draw import rdMolDraw2D
 from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
 from operator import itemgetter
 import os
+import pandas as pd
+import numpy
 
 DrawingOptions.includeAtomNumbers=True
 DrawingOptions.bondLineWidth=1.8
@@ -149,8 +149,9 @@ os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
 os.chdir(STARTINGDIR)
 
-# Initialise population 
+MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'Score', 'ID', 'Charge'])
 
+# Initialise population 
 while len(GeneratedMolecules) < GenerationSize:
     # Return to starting directory
     os.chdir(STARTINGDIR)
@@ -246,6 +247,8 @@ while len(GeneratedMolecules) < GenerationSize:
 
             # Initialise molecules for next generation
             GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge])
+            MoleculeDatabase.loc[len(MoleculeDatabase)] = [MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge]
+            
             print(f'Final Molecule SMILES: {MutMolSMILES}')
             counter +=1
 
@@ -257,8 +260,10 @@ while len(GeneratedMolecules) < GenerationSize:
  
     FirstGenerationAttempts += 1
 
+MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
+
 ################################### Subsequent generations #################################################
-MaxGenerations = 4 
+MaxGenerations = 100 
 NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
@@ -428,16 +433,16 @@ for generation in range(2, MaxGenerations):
                     continue   
 
                 # Add candidate and it's data to master list
-                GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, 
-                                                    Score, ID]
+                GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, Score, Name]
+                MoleculeDatabase.loc[len(MoleculeDatabase)] = [result[2], result[0], PreviousMutations, NumHeavyAtoms, Score, Name, charge]
 
                 # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
                 # being overwritten
-                GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, 
-                                        Score, ID])
+                GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, Score, ID])
                 
                 IDcounter += 1
 
+    MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
     # # Tasks to perform at end of every generation
     # # Simulate molecules that haven't been yet been simulated
 
