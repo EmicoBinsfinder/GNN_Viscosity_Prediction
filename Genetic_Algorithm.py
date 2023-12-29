@@ -76,15 +76,12 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
         cmd,
         text=True,
         shell=True)
-    
     return process
 
 runcmd('module load anaconda3/personal')
 runcmd('source activate HTVS')
-
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
-
 runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
 
 ################# IMPORTS ###################
