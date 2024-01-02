@@ -6,6 +6,7 @@ from rdkit.Chem import AllChem
 from rdkit.Chem.Draw import MolDrawing, DrawingOptions
 from rdkit.Chem import rdFMCS
 from rdkit.Chem.Draw import rdDepictor
+from rdkit.Chem.rdMolDescriptors import CalcMolFormula
 from random import choice as rnd
 import random
 from rdkit.Chem.Draw import rdMolDraw2D
@@ -14,6 +15,7 @@ from copy import deepcopy
 from operator import itemgetter
 import subprocess
 import ast
+import re
 import requests
 import os
 
@@ -740,8 +742,8 @@ def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.{FileType}')}"):
         print(f'Specified {FileType} file already exists in this location, overwriting')
         os.remove(f"{os.path.join(CWD, f'{Name}.{FileType}')}")
-    else:
-        os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
+
+    os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
 
 def MakePackmolFile(Name, CWD):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):
@@ -786,10 +788,10 @@ def MakeLAMMPSFile(Name, CWD):
         print('Specified Moltemplate file already exists in this location, overwriting.')
         os.remove(f"{os.path.join(CWD, f'{Name}_system.lammps')}")
 
-    with open(os.path.join(CWD, f'{Name}_system.lammps'), 'x') as file:
+    with open(os.path.join(CWD, f'{Name}_system_313K.lammps'), 'x') as file:
         file.write(f"""
 # Setup parameters
-variable       		T equal 3 # Equilibrium temperature [F]
+variable       		T equal 313 # Equilibrium temperature [K]
 log             	logEQM_{Name}_T${{T}}KP1atm.out
 
 #include         "{Name}_system.in.init" Need to determine correct Kspace params
@@ -819,7 +821,7 @@ include         "{Name}_system.in.settings"
 # Define variables
 variable        	eqmT equal $T			 			# Equilibrium temperature [K]
 variable        	eqmP equal 1.0						# Equilibrium pressure [atm]
-variable    		p equal 100						# Nrepeat, correlation length
+variable    		p equal 100						    # Nrepeat, correlation length
 variable    		s equal 10       					# Nevery, sample interval
 variable    		d equal $s*$p  						# Nfreq, dump interval
 variable 			rho equal density
@@ -843,19 +845,18 @@ reset_timestep  	0
 neigh_modify 		every 1 delay 0 check yes
 
 # NVT at high temperature
-fix             	nvt1000K all nvt temp 300.0 300.0 100.0
-thermo			$d
+fix             	nvt313K all nvt temp 300.0 300.0 100.0
+thermo			    $d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
-					append thermoNVT1000K_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-dump            	1 all custom $d NVT1000K_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
+					append thermoNVT313K_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
+dump            	1 all custom $d NVT313K_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
 dump_modify     	1 sort id
 run            		250000
 undump          	1
-unfix			nvt1000K
-unfix               	thermo_print
-write_restart   	NVT1000K_{Name}_T${{T}}KP1atm.restart
-
+unfix			    nvt313K
+unfix               thermo_print
+write_restart   	NVT_{Name}_T${{T}}KP1atm.restart
 
 # NPT: Isothermal-isobaric ensemble to set the desired pressure; compute average density at that pressure
 fix 				NPT all npt temp ${{eqmT}} ${{eqmT}} 100.0 iso ${{eqmP}} ${{eqmP}} 25.0
@@ -982,5 +983,77 @@ write_data          GKvisc_{Name}_T${{T}}KP1atm.data
 
 """)
         
-def CalcVI():
-    pass
+def GetMolMass(mol):
+    formula = CalcMolFormula(mol)
+
+    parts = re.findall("[A-Z][a-z]?|[0-9]+", formula)
+    mass = 0
+
+    for index in range(len(parts)):
+        if parts[index].isnumeric():
+            continue
+
+        atom = Chem.Atom(parts[index])
+        multiplier = int(parts[index + 1]) if len(parts) > index + 1 and parts[index + 1].isnumeric() else 1
+        mass += atom.GetMass() * multiplier
+    return mass
+
+def GenMolChecks(result, GeneratedMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms):
+    if result[0]!= None:
+        #Get number of heavy atoms in mutated molecule
+        NumHeavyAtoms = result[0].GetNumHeavyAtoms()
+        
+        # Limit number of heavy atoms in generated candidates
+        if NumHeavyAtoms > MaxNumHeavyAtoms:
+            print('Molecule has too many heavy atoms')
+            MutMol = None
+        
+        # Check if molecule is too short
+        elif NumHeavyAtoms < MinNumHeavyAtoms:
+            print('Molecule too short')
+            MutMol = None
+
+        # Check if candidate has already been generated by checking if SMILES string is in master list
+        elif result[2] in GeneratedMolecules.keys():
+            print('Molecule previously generated')
+            MutMol = None
+
+        # Check for illegal substructures
+        elif CheckSubstruct(result[0]):
+            MutMol = None
+        
+        else:
+            MutMol = result[0]
+
+    # Check for null results or fragmented molecules
+    elif result[0] == None or len(Chem.GetMolFrags(result[0])) > 1:
+        print('Fragmented molecule generated')
+        MutMol = None
+
+    else:
+        MutMol = result[0]
+
+    return MutMol
+
+def GetDensVisc(DensityFile, ViscosityFile):
+    with open(f'{DensityFile}', 'r+') as file:
+        content = file.readlines()[-1]
+        content = content.split(' ')[-1]
+        Density = content.split('\n')[0]
+
+    with open(f'{ViscosityFile}', 'r+') as file:
+        content = file.readlines()
+        for line in content:
+            if 'average viscosity' in line:
+                viscline = line.split(' ')
+                Viscosity = viscline[2]
+
+    return Density, Viscosity
+
+STARTINGDIR = deepcopy(os.getcwd())
+Name = 'Generation_12_Molecule_21'
+DensityPath = f'{STARTINGDIR}/eqmDensity_{Name}_T300FP1atm.out'
+ViscosityPath = f'{STARTINGDIR}/logGKvisc_{Name}_T300FP1atm.out'
+
+Density, Viscosity = GetDensVisc(DensityPath, ViscosityPath)
+
