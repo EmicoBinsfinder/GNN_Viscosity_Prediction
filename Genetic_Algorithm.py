@@ -349,7 +349,7 @@ for generation in range(2, MaxGenerations):
                 MutMol = None
 
             # Check for molecules that are too short
-            elif result[0].GetNumHeavyAtoms() < 3:
+            elif result[0].GetNumHeavyAtoms() < 5:
                 print('Molecule too short')
                 MutMol = None
 
@@ -447,3 +447,14 @@ for generation in range(2, MaxGenerations):
     # # Simulate molecules that haven't been yet been simulated
 
 print(f'Number of failed mutations: {Fails}')
+
+"""
+Extras to add:
+
+- We calculate dynamic viscosity, need to convert to kinematic
+- Based on above, store density of system
+- Generation of the pbs script for each molecule to be accessed by array script
+- Need to run two separate simulations at the two different temperatures
+- Return number density seeing as we calculate it in script
+
+"""
