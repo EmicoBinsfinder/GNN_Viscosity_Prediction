@@ -1305,9 +1305,7 @@ cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction
 mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
-
-       
-
+    
 
 
 # CWD = deepcopy(os.getcwd())
