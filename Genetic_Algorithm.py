@@ -131,16 +131,16 @@ Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment
 # GENETIC ALGORITHM HYPERPARAMETERS
 Silent = True # Edit outputs to only print if this flag is False
 NumElite = 15
-counter = 0
+IDcounter = 0
 FirstGenerationAttempts = 0
-GeneratedMolecules = {}
 GenerationMolecules = []
+FirstGenSimList = []
 MaxNumHeavyAtoms = 50
 MinNumHeavyAtoms = 5
 showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
 LOPLS = True # Whether or not to use OPLS or LOPLS, False uses OPLS
-MaxGenerations = 3
+MaxGenerations = 100
 NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
@@ -153,10 +153,11 @@ os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
 os.chdir(STARTINGDIR)
 
-MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'Score', 'ID', 'Charge', 'MolMass', 'Predecessor'])
+# Master Dataframe where molecules from all generations will be stored
+MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score'])
 
 # Initialise population 
-while len(GeneratedMolecules) < GenerationSize:
+while len(MoleculeDatabase) < GenerationSize:
     # Return to starting directory
     os.chdir(STARTINGDIR)
 
@@ -171,7 +172,7 @@ while len(GeneratedMolecules) < GenerationSize:
     result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
 
     # Implement checks based on predetermined criteria (MolLength, Illegal Substructs etc.)
-    if GAF.GenMolChecks(result, GeneratedMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms) == None:
+    if GAF.GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms) == None:
         MutMol = None
 
     else:
@@ -180,9 +181,9 @@ while len(GeneratedMolecules) < GenerationSize:
         MolMass = GAF.GetMolMass(MutMol) # Get estimate of of molecular mass 
         MutMolSMILES = result[2] # SMILES of mutated molecule
         Predecessor = result[3] # Get history of last two mutations performed on candidate
-        Score = GAF.fitfunc(MutMolSMILES, 1) # Apply fitness function to candidate SMILES string
-        ID = counter
+        ID = IDcounter
 
+        # Try Making all the files 
         try:
             Name = f'Generation_1_Molecule_{ID}' # Set name of Molecule as its SMILES string
 
@@ -233,49 +234,77 @@ while len(GeneratedMolecules) < GenerationSize:
                 assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
                 assert os.path.exists(os.path.join(CWD, f'{Name}_system.data')), 'Data file not generated'                    
                 assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.init')), 'Init file not generated'                
-               
-            # Add molecules to master list
-            GeneratedMolecules[f'{MutMolSMILES}'] = [MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge, MolMass, Predecessor] 
 
-            # Initialise molecules for next generation
-            GenerationMolecules.append([MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge])
-            MoleculeDatabase.loc[len(MoleculeDatabase)] = [MutMolSMILES, MutMol, [None, Mutation], HeavyAtoms, Score, Name, charge, MolMass, Predecessor]
+            # Update Molecule database
+            MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
+                                              MutationList=[None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+           
+            # Generate list of molecules to simulate in this generation
+            FirstGenSimList.append(Name)
+            print(f'Final Molecule SMILES: {MutMolSMILES}') 
             
-            print(f'Final Molecule SMILES: {MutMolSMILES}')
-            counter +=1
+            IDcounter +=1
 
         except Exception as E:
             print(E)
             if type(E) == AssertionError:
                sys.exit()
-            continue   
- 
+            continue     
     FirstGenerationAttempts += 1
+
+# Run MD simulations and retreive performance 
+for Molecule in FirstGenSimList:
+    Score = GAF.fitfunc(Molecule, Generation=1)
+    IDNumber = int(Molecule.split('_')[-1])
+    MoleculeDatabase.loc[IDNumber, 'Score'] = Score
+
+# Create dictionary for comparison
+GenerationMolecules = pd.Series(MoleculeDatabase.Score.values, index=MoleculeDatabase.ID).to_dict()
+
+# Sort dictiornary according to target properties
+ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[1], reverse=True)
+
+#Convert tuple elements in sorted list back to lists 
+ScoreSortedMolecules = [list(x) for x in ScoreSortedMolecules]
+
+# Constructing entries for use in subsequent generation
+for entry in ScoreSortedMolecules:
+    Key = int(entry[0].split('_')[-1])
+    entry.insert(1, MoleculeDatabase.iloc[Key]['MolObject'])
+    entry.insert(2, MoleculeDatabase.iloc[Key]['MutationList'])
+    entry.insert(3, MoleculeDatabase.iloc[Key]['HeavyAtoms'])
+
+GenerationMolecules = ScoreSortedMolecules[:NumElite]
+
+# QSUB each of the simulations based on file names in FirstGenSim list in array job
+# Add some form of wait condition to allow all simulations to finish before next steps
+    # This could just be a read of the qstat to see how far the array job has progressed
+# Hope that all 50 work haha
+# Retrieve the viscosities and the density from
+# Perform calculation of VI 
+# Add values for the density, each of the calculated dynamic viscosities and the VI to master dataframe
+
 
 MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
 
-################################### Subsequent generations #################################################
-
-for generation in range(2, MaxGenerations):
+################################## Subsequent generations #################################################
+for generation in range(2, MaxGenerations + 1):
     GenerationTotalAttempts = 0
-    IDcounter = 1 # Counter for generating molecule IDs
-
-    # Perform elitism selection
-    ScoreSortedMolecules = sorted(GenerationMolecules, key=itemgetter(4), reverse=True)
+    GenSimList = []
 
     os.chdir(STARTINGDIR)
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
-    GenerationMolecules = ScoreSortedMolecules[:NumElite]
+    GenerationMoleculeList = ScoreSortedMolecules[:NumElite]
     os.chdir(os.path.join(os.getcwd(), 'Molecules')) 
     GAF.runcmd(f'mkdir Generation_{generation}')
     os.chdir(STARTINGDIR)
 
-    for i, entry in enumerate(GenerationMolecules): #Start by mutating best performing molecules from previous generation and work down
+    for i, entry in enumerate(ScoreSortedMolecules): #Start by mutating best performing molecules from previous generation and work down
         MutMol = None
         attempts = 0
 
         # Stop appending mutated molecules once generation reaches desired size
-        if len(GenerationMolecules) == GenerationSize:
+        if len(GenerationMoleculeList) == GenerationSize:
             break
 
         # Attempt mutation on each molecule, not moving on until a valid mutation has been suggested
@@ -298,7 +327,7 @@ for generation in range(2, MaxGenerations):
             Name = f'Generation_{generation}_Molecule_{IDcounter}'
 
             if NumHeavyAtoms > 42:
-                MutationList = ['RemoveAtom']
+                MutationList = ['RemoveAtom', 'ReplaceAtom', 'ReplaceBond']
             else:
                 MutationList = Mutations 
             
@@ -315,16 +344,15 @@ for generation in range(2, MaxGenerations):
             #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
             result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
             
-            if GAF.GenMolChecks(result, GeneratedMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms) == None:
+            if GAF.GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms) == None:
                 MutMol = None
         
             else:
-                NumHeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
+                HeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
                 MutMol = result[0] # Get Mol object of mutated molecule
                 MolMass = GAF.GetMolMass(MutMol) # Get estimate of of molecular mass 
                 MutMolSMILES = result[2] # SMILES of mutated molecule
                 Predecessor = result[3] # Get history of last two mutations performed on candidate
-                Score = GAF.fitfunc(MutMolSMILES, 1) # Apply fitness function to candidate SMILES string
 
                 print(f'Number of Heavy Atoms after mutation: {NumHeavyAtoms}')                
 
@@ -388,28 +416,55 @@ for generation in range(2, MaxGenerations):
                         assert os.path.exists(os.path.join(CWD, f'{Name}_system.in.init')), 'Init file not generated'                
 
                     # Return to starting directory
-                    os.chdir(STARTINGDIR) 
-                  
+                    os.chdir(STARTINGDIR)
+
+                    # Add candidate and it's data to master list
+                    MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
+                                            MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+
+                    # Generate list of molecules to simulate in this generation
+                    GenSimList.append(Name)
+                    print(f'Final Molecule SMILES: {MutMolSMILES}') 
+                    GenerationMoleculeList.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, ID, MolMass, Predecessor])
+                    IDcounter += 1
+
                 except Exception as E:
                     print(E)
                     if type(E) == AssertionError:
                         sys.exit()
                     continue   
 
-                # Add candidate and it's data to master list
-                GeneratedMolecules[f'{result[2]}'] = [result[0], PreviousMutations, NumHeavyAtoms, Score, Name, charge, MolMass, Predecessor]
-                MoleculeDatabase.loc[len(MoleculeDatabase)] = [result[2], result[0], PreviousMutations, NumHeavyAtoms, Score, Name, charge, MolMass, Predecessor]
+        MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
+        # # Tasks to perform at end of every generation (i.e get best performing molecules from this generation)
+        # # Simulate molecules that haven't been yet been simulated
 
-                # Molecules to initiate next generation, add NumElite to insertion index to prevent elite molecules
-                # being overwritten
-                GenerationMolecules.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, Score, ID, MolMass, Predecessor])
-                IDcounter += 1
+    #This is where we should call the simulation script
+    for Molecule in GenSimList:
+        Score = GAF.fitfunc(Molecule, Generation=generation)
+        IDNumber = int(Molecule.split('_')[-1])
+        MoleculeDatabase.loc[IDNumber, 'Score'] = Score
 
+    # Create dictionary for comparison
+    GenerationMolecules = pd.Series(MoleculeDatabase.Score.values, index=MoleculeDatabase.ID).to_dict()
+
+    # Sort dictiornary according to target properties
+    ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[1], reverse=True)
+
+    #Convert tuple elements in sorted list back to lists 
+    ScoreSortedMolecules = [list(x) for x in ScoreSortedMolecules]
+
+    # Constructing entries for use in subsequent generation
+    for entry in ScoreSortedMolecules:
+        Key = int(entry[0].split('_')[-1])
+        entry.insert(1, MoleculeDatabase.iloc[Key]['MolObject'])
+        entry.insert(2, MoleculeDatabase.iloc[Key]['MutationList'])
+        entry.insert(3, MoleculeDatabase.iloc[Key]['HeavyAtoms'])
+    
     MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
-    # # Tasks to perform at end of every generation (i.e get best performing molecules from this generation)
-    # # Simulate molecules that haven't been yet been simulated
 
+print(len(GenerationMoleculeList))
 print(f'Number of failed mutations: {Fails}')
+print(len(ScoreSortedMolecules[:NumElite]))
 
 """
 Extras to add:
@@ -418,6 +473,7 @@ Extras to add:
 - Generation of the pbs script for each molecule to be accessed by array script
 - Need to run two separate simulations at the two different temperatures
 - Return number density seeing as we calculate it in script (eqmDensityFile)
+- A way to weight different calculated parameters
 
 Current approacg used to calculate transport properties (viscosity and thermal conductivity)
 
