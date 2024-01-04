@@ -1294,18 +1294,17 @@ def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName):
 
     with open(os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs'), 'w') as file:
         file.write(f"""#!/bin/bash
-#PBS -l select=1:ncpus=64:mem=64gb
-#PBS -l walltime=72:00:00
+#PBS -l select=1:ncpus=32:mem=62gb
+#PBS -l walltime=07:59:59
 #PBS -J {BotValue}-{TopValue}
 
 module load intel-suite/2020.2
 module load mpi/intel-2019.6.166
 
-cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/{Generation}/Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}
+cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/Generation_{Generation}/Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}
 mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
-    
 
 
 # CWD = deepcopy(os.getcwd())
