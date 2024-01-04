@@ -1277,30 +1277,37 @@ def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, 
 
     return MoleculeDatabase
 
-def CreateArrayJob(CWD, Generation, Name):
+def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName):
     #Create an array job for each separate simulation
-    GenerationNumber = Generation[-2:]
-    GenerationRange = 50*GenerationNumber
-    ListRange = range(GenerationRange, Generation - 15)
-    TopValue = ListRange[-1]
-    BotValue = ListRange[0]
+    if Generation == 1:
+        BotValue = 0
+        TopValue = 49
+    else:
+        GenerationRange = Generation*35 - 20
+        ListRange = list(range(GenerationRange, GenerationRange + 35))
+        TopValue = ListRange[-1]
+        BotValue = ListRange[0]
 
-    return TopValue, BotValue
+    if os.path.exists(f"{os.path.join(CWD, f'{SimName}.pbs')}"):
+        print(f'Specified file already exists in this location, overwriting')
+        os.remove(f"{os.path.join(CWD, f'{SimName}.pbs')}")       
 
-# print(CreateArrayJob(1, 12, 1))
+    with open(os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs'), 'w') as file:
+        file.write(f"""#!/bin/bash
+#PBS -l select=1:ncpus=64:mem=64gb
+#PBS -l walltime=72:00:00
+#PBS -J {BotValue}-{TopValue}
 
-#     with open(os.path.join(CWD, f'.pbs'), 'w') as file:
-#         file.write(f"""#!/bin/bash
-# #PBS -l select=1:ncpus=64:mem=64gb
-# #PBS -l walltime=72:00:00
-# #PBS -J 0-49
+module load intel-suite/2020.2
+module load mpi/intel-2019.6.166
 
-# module load intel-suite/2020.2
-# module load mpi/intel-2019.6.166
+cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/{Generation}/Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}
+mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
+""")
+    os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
 
-# cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/{Generation}/Generation_{GenerationNumber}_Molecule_${PBS_ARRAY_INDEX}
-# mpiexec ~/tmp/bin/lmp -in {Name}_system_313K.lammps
-# """)
+       
+
 
 
 # CWD = deepcopy(os.getcwd())
