@@ -145,9 +145,9 @@ NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
 
-PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
+#PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-#PYTHONPATH = 'python3'
+PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -247,25 +247,29 @@ while len(MoleculeDatabase) < GenerationSize:
 
         except Exception as E:
             print(E)
-            if type(E) == AssertionError:
-               sys.exit()
+            #if type(E) == AssertionError:
+            #  sys.exit()
             continue     
     FirstGenerationAttempts += 1
 
 # Run MD simulations and retreive performance 
-for Molecule in FirstGenSimList:
-    Generation = 1
-    CWD = os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
-    # Create and run array job for 40C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='313K.lammps')
-    if PYTHONPATH == 'python3':
-        GAF.runcmd(f'qsub {os.path.join(CWD, "313K.lammps.pbs")}')
-    
-    # Create and run array job for 100C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='373K.lammps')
-    if PYTHONPATH == 'python3':
-        GAF.runcmd(f'qsub {os.path.join(CWD, "373K.lammps.pbs")}')
 
+Generation = 1
+CWD = os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
+# Create and run array job for 40C viscosity
+GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='313K.lammps')
+
+# Create and run array job for 100C viscosity
+GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='373K.lammps')
+
+if PYTHONPATH == 'python3':
+    GAF.runcmd(f'qsub {os.path.join(CWD, "313K.lammps.pbs")}')
+
+if PYTHONPATH == 'python3':
+    GAF.runcmd(f'qsub {os.path.join(CWD, "373K.lammps.pbs")}')
+
+# Here is where we will get the various values generated from the MD simulations
+for Molecule in FirstGenSimList:
     # Create a function to wait until all simulations from this generation are finished
     Score = GAF.fitfunc(Molecule, Generation=1)
     IDNumber = int(Molecule.split('_')[-1])
