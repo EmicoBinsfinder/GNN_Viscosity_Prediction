@@ -61,7 +61,8 @@ gaseous lubricants)
 
 - Varying (decreasing) elitism factor to further increase novelty of molecules
 
-Look at COMPASS 3
+- Add detailed history of molecule mutations (why would this be useful)
+
 """
 
 ############### ENVIRONMENT SETUP ############
@@ -145,16 +146,21 @@ NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
 
-#PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
+PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-PYTHONPATH = 'python3'
+#-PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
 os.chdir(STARTINGDIR)
 
 # Master Dataframe where molecules from all generations will be stored
-MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score'])
+MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'Viscosity40C',
+                                        'Viscosity100C', 'VI', 'ThermalConductivity', 'PourPoint', 'DiffusionCoefficient', 'Density40C'])
+
+# Generation Dataframe to store molecules from each generation
+GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'Viscosity40C',
+                                        'Viscosity100C', 'VI', 'ThermalConductivity', 'PourPoint', 'DiffusionCoefficient', 'Density40C'])
 
 # Initialise population 
 while len(MoleculeDatabase) < GenerationSize:
@@ -223,7 +229,8 @@ while len(MoleculeDatabase) < GenerationSize:
             GAF.MakeMoltemplateFile(Name, CWD)
 
             # Make LAMMPS files
-            GAF.MakeLAMMPSFile(Name, CWD)
+            GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=3000000)
+            GAF.MakeLAMMPSFile(Name, CWD, Temp=363, GKRuntime=3000000)
 
             if PYTHONPATH == 'python3':
                 GAF.runcmd(f'packmol < {Name}.inp')
@@ -238,6 +245,9 @@ while len(MoleculeDatabase) < GenerationSize:
             # Update Molecule database
             MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
                                               MutationList=[None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+
+            GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
+                                              MutationList=[None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
            
             # Generate list of molecules to simulate in this generation
             FirstGenSimList.append(Name)
@@ -247,13 +257,10 @@ while len(MoleculeDatabase) < GenerationSize:
 
         except Exception as E:
             print(E)
-            #if type(E) == AssertionError:
-            #  sys.exit()
             continue     
     FirstGenerationAttempts += 1
 
 # Run MD simulations and retreive performance 
-
 Generation = 1
 CWD = os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # Create and run array job for 40C viscosity
@@ -272,8 +279,28 @@ if PYTHONPATH == 'python3':
 for Molecule in FirstGenSimList:
     # Create a function to wait until all simulations from this generation are finished
     Score = GAF.fitfunc(Molecule, Generation=1)
+    os.chdir(os.path.join(STARTINGDIR, 'Generation_1', Molecule))
+    CWD = os.getcwd()
+    #Get Densities
+    Dens40 = GAF.GetDens(f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out')
+    Dens100 = GAF.GetDens(f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out')
+    print(Dens40, Dens100)
+    #Get Viscosities
+    Visc40 = GAF.GetVisc(f'{CWD}/logGKvisc_{Molecule}_T313KP1atm.out')
+    Visc100 = GAF.GetVisc(f'{CWD}/logGKvisc_{Molecule}_T373KP1atm.out')
+
+    print(Visc40, Visc100)
+    #Get VI
+
+    #Update Molecule Database
     IDNumber = int(Molecule.split('_')[-1])
     MoleculeDatabase.loc[IDNumber, 'Score'] = Score
+    MoleculeDatabase.loc[IDNumber, 'Density100C'] = Dens100
+    MoleculeDatabase.loc[IDNumber, 'Density40C'] = Dens40
+    MoleculeDatabase.loc[IDNumber, 'Viscosity40C'] = Visc40
+    MoleculeDatabase.loc[IDNumber, 'Viscosity100C'] = Visc100
+    # MoleculeDatabase.loc[IDNumber, 'VI'] = VI
+
 
 # Create dictionary for comparison
 GenerationMolecules = pd.Series(MoleculeDatabase.Score.values, index=MoleculeDatabase.ID).to_dict()
@@ -296,17 +323,22 @@ GenerationMolecules = ScoreSortedMolecules[:NumElite]
 # QSUB each of the simulations based on file names in FirstGenSim list in array job
 # Add some form of wait condition to allow all simulations to finish before next steps
     # This could just be a read of the qstat to see how far the array job has progressed
+    # Perform a check every 30 mins
 # Hope that all 50 work haha
-# Retrieve the viscosities and the density from
+# Retrieve the viscosities and the density from files
 # Perform calculation of VI 
 # Add values for the density, each of the calculated dynamic viscosities and the VI to master dataframe
 
 MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
+GenerationDatabase.to_excel(f'{STARTINGDIR}/Generation1Database.xlsx')
 
 ################################## Subsequent generations #################################################
 # for generation in range(2, MaxGenerations + 1):
 #     GenerationTotalAttempts = 0
 #     GenSimList = []
+
+#     GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'Viscosity40C',
+#                                         'Viscosity100C', 'VI', 'ThermalConductivity', 'PourPoint', 'DiffusionCoefficient', 'Density40C'])
 
 #     os.chdir(STARTINGDIR)
 #     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
@@ -419,7 +451,8 @@ MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
 #                     GAF.MakeMoltemplateFile(Name, CWD)
 
 #                     # Make LAMMPS files
-#                     GAF.MakeLAMMPSFile(Name, CWD)
+#                     GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=3000000)
+#                     GAF.MakeLAMMPSFile(Name, CWD, Temp=363, GKRuntime=3000000)
 
 #                     if PYTHONPATH == 'python3':
 #                         GAF.runcmd(f'packmol < {Name}.inp') # Run packmol in command line
@@ -437,6 +470,9 @@ MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
 #                     # Add candidate and it's data to master list
 #                     MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
 #                                             MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+                    
+#                     GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
+#                         MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
 
 #                     # Generate list of molecules to simulate in this generation
 #                     GenSimList.append(Name)
@@ -446,27 +482,24 @@ MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
 
 #                 except Exception as E:
 #                     print(E)
-#                     if type(E) == AssertionError:
-#                         sys.exit()
 #                     continue   
 
-#         MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
-#         # # Tasks to perform at end of every generation (i.e get best performing molecules from this generation)
-#         # # Simulate molecules that haven't been yet been simulated
+#     # # Tasks to perform at end of every generation (i.e get best performing molecules from this generation)
+#     # # Simulate molecules that haven't been yet been simulated
 
 #     #This is where we should call the simulation script
+#     CWD = os.path.join(STARTINGDIR, 'Molecules', f'Generation_{generation}')
+#     # Create array job for 40C viscosity
+#     GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='313K.lammps')
+#     # Create array jpb for 100C viscosity
+#     GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='373K.lammps')
+        
 #     for Molecule in GenSimList:
-#         Generation = generation
-#         CWD = os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
-#         # Create array job for 40C viscosity
-#         GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='313K.lammps')
-#         # Create array jpb for 100C viscosity
-#         GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='373K.lammps')
 #         Score = GAF.fitfunc(Molecule, Generation=generation)
 #         IDNumber = int(Molecule.split('_')[-1])
 #         MoleculeDatabase.loc[IDNumber, 'Score'] = Score
 
-#     # Create dictionary for comparison
+#     # Create dictionary for comparison of molecule score
 #     GenerationMolecules = pd.Series(MoleculeDatabase.Score.values, index=MoleculeDatabase.ID).to_dict()
 
 #     # Sort dictiornary according to target properties
@@ -483,26 +516,27 @@ MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
 #         entry.insert(3, MoleculeDatabase.iloc[Key]['HeavyAtoms'])
     
 #     MoleculeDatabase.to_excel(f'{STARTINGDIR}/MoleculeDatabase.xlsx')
+#     GenerationDatabase.to_excel(f'{STARTINGDIR}/Generation{generation}_Database.xlsx')
 
 # print(len(GenerationMoleculeList))
 # print(f'Number of failed mutations: {Fails}')
 # print(len(ScoreSortedMolecules[:NumElite]))
 
-# """
-# Extras to add:
-# - We calculate dynamic viscosity, need to convert to kinematic
-# - Based on above, store density of system
-# - Generation of the pbs script for each molecule to be accessed by array script
-# - Need to run two separate simulations at the two different temperatures
-# - Return number density seeing as we calculate it in script (eqmDensityFile)
-# - A way to weight different calculated parameters
+# # """
+# # Extras to add:
+# # - We calculate dynamic viscosity, need to convert to kinematic
+# # - Based on above, store density of system
+# # - Generation of the pbs script for each molecule to be accessed by array script
+# # - Need to run two separate simulations at the two different temperatures
+# # - Return number density seeing as we calculate it in script (eqmDensityFile)
+# # - A way to weight different calculated parameters
 
-# Current approacg used to calculate transport properties (viscosity and thermal conductivity)
+# # Current approacg used to calculate transport properties (viscosity and thermal conductivity)
 
-# - NVT at high temperature
-# - NPT at 1 atmospheric temperature
-# - NVT again to deform box to account for change in pressure
-# - NVE to relax system
-# - NVE used in the production run (you can indeed use NVE and langevin thermostat)
+# # - NVT at high temperature
+# # - NPT at 1 atmospheric temperature
+# # - NVT again to deform box to account for change in pressure
+# # - NVE to relax system
+# # - NVE used in the production run (you can indeed use NVE and langevin thermostat)
 
-# """
+# # """
