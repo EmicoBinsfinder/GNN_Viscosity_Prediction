@@ -1079,10 +1079,23 @@ def GetVisc(ViscosityFile):
     #         Viscosity = 0    
     
     return Viscosity
-        
+
+def GetKVisc(DVisc, Dens):
+    # Convert from Pa.s to cP
+    cPVisc = DVisc * 1000
+    return cPVisc / Dens
+
 def GetVI(DVisc40, DVisc100, Dens40, Dens100):
     pass
 
+
+"""
+#VI D2270 standard with values in table
+#http://ppapco.ir/wp-content/uploads/2019/07/ASTM-D2270-2016.pdf
+
+Seems like I'll need to manually make this table into an excel spreadsheet
+Then we can make reference to table based on values generated for kVisc
+"""
 
 def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, Charge, MolMass, Predecessor):
     MoleculeDatabase.loc[IDCounter, 'SMILES'] = MutMolSMILES
@@ -1132,5 +1145,3 @@ mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_
 # ViscosityPath = f'{CWD}/logGKvisc_{Name}_T300FP1atm.out'
 
 # Density = GetDens(DensityPath)
-# Viscosity = GetVisc(ViscosityPath)
-
