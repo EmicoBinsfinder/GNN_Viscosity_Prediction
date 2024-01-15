@@ -146,9 +146,9 @@ NumGenerations = 1
 MaxMutationAttempts = 200
 Fails = 0
 
-PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
+#PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-#-PYTHONPATH = 'python3'
+PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(os.path.join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -195,9 +195,9 @@ while len(MoleculeDatabase) < GenerationSize:
 
             # Set feature definition file path to OPLS or LOPLS depending on user choice 
             if LOPLS:
-                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
             else:
-                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
             
             #Attempt to parameterise with OPLS
             GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -230,7 +230,7 @@ while len(MoleculeDatabase) < GenerationSize:
 
             # Make LAMMPS files
             GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=3000000)
-            GAF.MakeLAMMPSFile(Name, CWD, Temp=363, GKRuntime=3000000)
+            GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=3000000)
 
             if PYTHONPATH == 'python3':
                 GAF.runcmd(f'packmol < {Name}.inp')
@@ -244,10 +244,10 @@ while len(MoleculeDatabase) < GenerationSize:
 
             # Update Molecule database
             MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                                              MutationList=[None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+                                              MutationList=[None, None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
 
             GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                                              MutationList=[None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+                                              MutationList=[None, None, Mutation], ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
            
             # Generate list of molecules to simulate in this generation
             FirstGenSimList.append(Name)
@@ -412,9 +412,9 @@ for generation in range(2, MaxGenerations + 1):
                 try: # Try to generate all necessary files to simulate molecule
                     # Set feature definition file path to OPLS or LOPLS depending on user choice 
                     if LOPLS:
-                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
                     else:
-                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                        LTCOMMAND = f"{os.path.join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
                     
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
@@ -451,7 +451,7 @@ for generation in range(2, MaxGenerations + 1):
 
                     # Make LAMMPS files
                     GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=3000000)
-                    GAF.MakeLAMMPSFile(Name, CWD, Temp=363, GKRuntime=3000000)
+                    GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=3000000)
 
                     if PYTHONPATH == 'python3':
                         GAF.runcmd(f'packmol < {Name}.inp') # Run packmol in command line

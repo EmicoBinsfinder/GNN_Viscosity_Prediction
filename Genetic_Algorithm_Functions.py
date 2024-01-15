@@ -15,8 +15,10 @@ from copy import deepcopy
 from operator import itemgetter
 import subprocess
 import ast
+import pandas as pd
 import re
 import requests
+import math
 import os
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
@@ -736,7 +738,26 @@ def CheckMoveFile(Name, STARTINGDIR, FileType, CWD):
 
     os.rename(f"{os.path.join(STARTINGDIR, f'{Name}.{FileType}')}", f"{os.path.join(CWD, f'{Name}.{FileType}')}")
 
-def MakePackmolFile(Name, CWD):
+def MakeMoltemplateFile(Name, CWD, NumMols, BoxL):
+    if os.path.exists(f"{os.path.join(CWD, f'{Name}_system.lt')}"):
+        print('Specified Moltemplate file already exists in this location, overwriting.')
+        os.remove(f"{os.path.join(CWD, f'{Name}_system.lt')}")
+
+    with open(os.path.join(CWD, f'{Name}_system.lt'), 'x') as file:
+                file.write(f"""
+import "{Name}.lt"  # <- defines the molecule type.
+
+# Periodic boundary conditions:
+write_once("Data Boundary") {{
+   0.0  {BoxL}.00  xlo xhi
+   0.0  {BoxL}.00  ylo yhi
+   0.0  {BoxL}.00  zlo zhi
+}}
+
+ethylenes = new {Name} [{NumMols}]
+""")
+                
+def MakePackmolFile(Name, CWD, NumMols, BoxL):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):
         print('Packmol file already exists in this location, overwriting')
         os.remove(f"{os.path.join(CWD, f'{Name}.inp')}")
@@ -749,8 +770,8 @@ output {Name}_PackmolFile.pdb
 filetype pdb
 
 structure {Name}.pdb
-number 50 
-inside cube 0. 0. 0. 50.
+number {NumMols} 
+inside cube 0. 0. 0. {BoxL}.
 end structure""")
 
 def MakeMoltemplateFile(Name, CWD):
@@ -1030,7 +1051,6 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
 
     return MutMol
 
-
 def GetVisc(ViscosityFile):
     try:
         with open(f'{ViscosityFile}', 'r+') as file:
@@ -1085,17 +1105,9 @@ def GetKVisc(DVisc, Dens):
     cPVisc = DVisc * 1000
     return cPVisc / Dens
 
-def GetVI(DVisc40, DVisc100, Dens40, Dens100):
-    pass
-
-
-"""
-#VI D2270 standard with values in table
-#http://ppapco.ir/wp-content/uploads/2019/07/ASTM-D2270-2016.pdf
-
-Seems like I'll need to manually make this table into an excel spreadsheet
-Then we can make reference to table based on values generated for kVisc
-"""
+def CalcBoxLen(MolMass, Dens, NumMols):
+    # Very conservative implementation of Packmol volume guesser
+    return (((MolMass * NumMols * 2)/ Dens) * 1.25) ** (1./3.)
 
 def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, Charge, MolMass, Predecessor):
     MoleculeDatabase.loc[IDCounter, 'SMILES'] = MutMolSMILES
@@ -1137,6 +1149,50 @@ cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction
 mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
+
+def GetKVI(DVisc40, DVisc100, Dens40, Dens100):
+    RefVals = pd.read_excel('VILookupTable.xlsx')
+    return RefVals
+
+def GetDVI():
+    """
+    Let's use the DVI method used by Kajita or
+    we could make our own relation and see how that 
+    compares to KVI measurements 
+    """
+    pass
+
+RefVals = pd.read_excel('VILookupTable.xlsx', index_col=None)
+"""
+Perform Linear interpolation where necessary to calculate L and H values
+As the intervals change throughout the range of reference values,
+we will need to get the closest two values to input value before
+performing the interpolation.
+"""
+
+# Retrive L and H value
+KVisc100 = 24.3
+KVisc40 = 25.47643673
+
+# Code conditions for if Kvisc100 is exact match to value in lookup table
+
+RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
+RefVals_Sorted = RefVals.sort_values(by='Diffs')
+NearVals = RefVals_Sorted.head(2)
+
+# Put KVI, L and H values into List to organise values for interpolation
+KVIVals = sorted(NearVals['KVI'].tolist())
+LVals = sorted(NearVals['L'].tolist())
+HVals = sorted(NearVals['H'].tolist())
+
+# Perform Interpolation
+InterLVal = LVals[0] + (((KVisc100 - KVIVals[0])*(LVals[1]-LVals[0])) / (KVIVals[1]-KVIVals[0]))
+InterHVal = HVals[0] + (((KVisc100 - KVIVals[0])*(HVals[1]-HVals[0])) / (KVIVals[1]-KVIVals[0]))
+
+# Calculate KVI
+VI = ((InterLVal - KVisc40)/(InterLVal - InterHVal)) * 100
+
+print(VI)
 
 
 # CWD = deepcopy(os.getcwd())
