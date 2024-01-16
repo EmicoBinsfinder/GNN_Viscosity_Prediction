@@ -291,6 +291,7 @@ for Molecule in FirstGenSimList:
 
     # print(Visc40, Visc100)
     # #Get VI
+    
 
     # #Update Molecule Database
     # IDNumber = int(Molecule.split('_')[-1])

@@ -18,7 +18,7 @@ import ast
 import pandas as pd
 import re
 import requests
-import math
+from math import log10
 import os
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
@@ -1150,50 +1150,60 @@ mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
 
-def GetKVI(DVisc40, DVisc100, Dens40, Dens100):
-    RefVals = pd.read_excel('VILookupTable.xlsx')
-    return RefVals
-
-def GetDVI():
+def GetDVI(DVisc40, DVisc100):
     """
     Let's use the DVI method used by Kajita or
     we could make our own relation and see how that 
     compares to KVI measurements 
     """
-    pass
 
-RefVals = pd.read_excel('VILookupTable.xlsx', index_col=None)
-"""
-Perform Linear interpolation where necessary to calculate L and H values
-As the intervals change throughout the range of reference values,
-we will need to get the closest two values to input value before
-performing the interpolation.
-"""
+    S = (-log10( (log10(DVisc40) + 1.2) / (log10(DVisc100) + 1.2) )) / (log10(175/235))
+    DVI = 220 - (7*(10**S))
+    return DVI
 
-# Retrive L and H value
-KVisc100 = 24.3
-KVisc40 = 25.47643673
+def GetKVI(DVisc40, DVisc100, Dens40, Dens100):
+    # Get Kinematic Viscosities
+    KVisc40 = GetKVisc(DVisc40, Dens40)
+    KVisc100 = GetKVisc(DVisc100, Dens100)
 
-# Code conditions for if Kvisc100 is exact match to value in lookup table
+    RefVals = pd.read_excel('VILookupTable.xlsx', index_col=None)
+    """
+    Perform Linear interpolation where necessary to calculate L and H values
+    As the intervals change throughout the range of reference values,
+    we will need to get the closest two values to input value before
+    performing the interpolation.
 
-RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
-RefVals_Sorted = RefVals.sort_values(by='Diffs')
-NearVals = RefVals_Sorted.head(2)
+    U = Kinematic Viscosity at 40C
+    Antilog(X) is just 10^X
+    """
 
-# Put KVI, L and H values into List to organise values for interpolation
-KVIVals = sorted(NearVals['KVI'].tolist())
-LVals = sorted(NearVals['L'].tolist())
-HVals = sorted(NearVals['H'].tolist())
+    # Retrive L and H value
+    RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
+    RefVals_Sorted = RefVals.sort_values(by='Diffs')
+    NearVals = RefVals_Sorted.head(2)
 
-# Perform Interpolation
-InterLVal = LVals[0] + (((KVisc100 - KVIVals[0])*(LVals[1]-LVals[0])) / (KVIVals[1]-KVIVals[0]))
-InterHVal = HVals[0] + (((KVisc100 - KVIVals[0])*(HVals[1]-HVals[0])) / (KVIVals[1]-KVIVals[0]))
+    # Put KVI, L and H values into List to organise values for interpolation
+    KVIVals = sorted(NearVals['KVI'].tolist())
+    LVals = sorted(NearVals['L'].tolist())
+    HVals = sorted(NearVals['H'].tolist())
 
-# Calculate KVI
-VI = ((InterLVal - KVisc40)/(InterLVal - InterHVal)) * 100
+    # Perform Interpolation,
+    InterLVal = LVals[0] + (((KVisc100 - KVIVals[0])*(LVals[1]-LVals[0])) / (KVIVals[1]-KVIVals[0]))
+    InterHVal = HVals[0] + (((KVisc100 - KVIVals[0])*(HVals[1]-HVals[0])) / (KVIVals[1]-KVIVals[0]))
 
-print(VI)
+    # Calculate KVI
+    # If U > H
+    if KVisc40 >= InterHVal:
+        VI = ((InterLVal - KVisc40)/(InterLVal - InterHVal)) * 100
+    # If H > U
+    elif InterHVal > KVisc40:
+        N = ((log10(InterHVal) - log10(KVisc40))/log10(KVisc100))
+        VI = (((10**N)-1)/0.00715) + 100
+    else:
+        print('VI Undefined for input Kinematic Viscosities')
+        VI = None
 
+    return VI
 
 # CWD = deepcopy(os.getcwd())
 # Name = 'Generation_12_Molecule_21'
