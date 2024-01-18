@@ -756,7 +756,22 @@ write_once("Data Boundary") {{
 
 ethylenes = new {Name} [{NumMols}]
 """)
-                
+
+def GetMolMass(mol):
+    formula = CalcMolFormula(mol)
+
+    parts = re.findall("[A-Z][a-z]?|[0-9]+", formula)
+    mass = 0
+
+    for index in range(len(parts)):
+        if parts[index].isnumeric():
+            continue
+
+        atom = Chem.Atom(parts[index])
+        multiplier = int(parts[index + 1]) if len(parts) > index + 1 and parts[index + 1].isnumeric() else 1
+        mass += atom.GetMass() * multiplier
+    return mass
+
 def MakePackmolFile(Name, CWD, NumMols, BoxL):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}.inp')}"):
         print('Packmol file already exists in this location, overwriting')
@@ -774,7 +789,7 @@ number {NumMols}
 inside cube 0. 0. 0. {BoxL}.
 end structure""")
 
-def MakeMoltemplateFile(Name, CWD):
+def MakeMoltemplateFile(Name, CWD, NumMols, BoxL):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}_system.lt')}"):
         print('Specified Moltemplate file already exists in this location, overwriting.')
         os.remove(f"{os.path.join(CWD, f'{Name}_system.lt')}")
@@ -785,15 +800,20 @@ import "{Name}.lt"  # <- defines the molecule type.
 
 # Periodic boundary conditions:
 write_once("Data Boundary") {{
-   0.0  50.00  xlo xhi
-   0.0  50.00  ylo yhi
-   0.0  50.00  zlo zhi
+   0.0  {BoxL}.00  xlo xhi
+   0.0  {BoxL}.00  ylo yhi
+   0.0  {BoxL}.00  zlo zhi
 }}
 
-ethylenes = new {Name} [50]
-
+ethylenes = new {Name} [{NumMols}]
 """)
     
+def CalcBoxLen(MolMass, TargetDens, NumMols):
+    # Very conservative implementation of Packmol volume guesser
+    BoxL = (((MolMass * NumMols * 2)/ TargetDens) * 2.5) ** (1./3.)
+    BoxLRounded = int(BoxL)
+    return BoxLRounded
+
 def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime):
     if os.path.exists(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}"):
         print('Specified Moltemplate file already exists in this location, overwriting.')
@@ -942,18 +962,33 @@ variable    		dt equal 1.0				# time step [fs]
 variable 		    V equal vol
 
 # convert from LAMMPS real units to SI
-variable    		kB equal 1.3806504e-23    	
+variable    		kB equal 1.3806504e-23
+variable            kCal2J equal 4186.0/6.02214e23
 variable    		atm2Pa equal 101325.0		
 variable    		A2m equal 1.0e-10 			
 variable    		fs2s equal 1.0e-15 			
 variable			Pas2cP equal 1.0e+3			
 variable    		convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}*${{Pas2cP}}
+variable            convertWk equal ${{kCal2J}}*${{kCal2J}}/${{fs2s}}/${{A2m}}
 
 ##################################### Viscosity Calculation #####################################################
 timestep     		${{dt}}						# define time step [fs]
 
 compute         	TT all temp
 compute         	myP all pressure TT
+
+###### Thermal Conductivity Calculations 
+
+compute         myKE all ke/atom
+compute         myPE all pe/atom
+compute         myStress all stress/atom NULL virial
+
+# compute heat flux vectors
+compute         flux all heat/flux myKE myPE myStress
+variable        Jx equal c_flux[1]/vol
+variable        Jy equal c_flux[2]/vol
+variable        Jz equal c_flux[3]/vol
+
 fix             	1 all nve
 fix             	2 all langevin ${{eqmT}} ${{eqmT}} 100.0 482648
 
@@ -981,12 +1016,26 @@ variable     v11 equal trap(f_SS[3])*${{scale}}
 variable     v22 equal trap(f_SS[4])*${{scale}}
 variable     v33 equal trap(f_SS[5])*${{scale}}
 
+fix          JJ all ave/correlate $s $p $d &
+             c_flux[1] c_flux[2] c_flux[3] type auto &
+             file profile.heatflux ave running
+
+
+variable        scale equal ${{convertWk}}/${{kB}}/$T/$T/$V*$s*${{dt}}
+variable        k11 equal trap(f_JJ[3])*${{scale}}
+variable        k22 equal trap(f_JJ[4])*${{scale}}
+variable        k33 equal trap(f_JJ[5])*${{scale}}
+
 thermo       		$d
-thermo_style custom step temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol
-fix thermo_print all print $d "$(temp) $(press) $(v_myPxy) $(v_myPxz) $(v_myPyz) $(v_v11) $(v_v22) $(v_v33) $(vol)" &
-    append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol"
+thermo_style custom step temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33 
+fix thermo_print all print $d "$(temp) $(press) $(v_myPxy) $(v_myPxz) $(v_myPyz) $(v_v11) $(v_v22) $(v_v33) $(vol) $(v_Jx) $(v_Jy) $(v_Jz) $(v_k11) $(v_k22) $(v_k33)" &
+    append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33"
 
 # Dump all molecule coordinates
+
+# save thermal conductivity to file
+variable     kav equal (v_k11+v_k22+v_k33)/3.0
+fix          fxave all ave/time $d 1 $d v_kav file lamda.profile
 
 #dump         1 all custom $d All_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
 run          {GKRuntime}
@@ -999,21 +1048,6 @@ write_data          GKvisc_{Name}_T${{T}}KP1atm.data
 
 """)
         
-def GetMolMass(mol):
-    formula = CalcMolFormula(mol)
-
-    parts = re.findall("[A-Z][a-z]?|[0-9]+", formula)
-    mass = 0
-
-    for index in range(len(parts)):
-        if parts[index].isnumeric():
-            continue
-
-        atom = Chem.Atom(parts[index])
-        multiplier = int(parts[index + 1]) if len(parts) > index + 1 and parts[index + 1].isnumeric() else 1
-        mass += atom.GetMass() * multiplier
-    return mass
-
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms):
     if result[0]!= None:
         #Get number of heavy atoms in mutated molecule
@@ -1105,23 +1139,19 @@ def GetKVisc(DVisc, Dens):
     cPVisc = DVisc * 1000
     return cPVisc / Dens
 
-def CalcBoxLen(MolMass, Dens, NumMols):
-    # Very conservative implementation of Packmol volume guesser
-    return (((MolMass * NumMols * 2)/ Dens) * 1.25) ** (1./3.)
-
 def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, Charge, MolMass, Predecessor):
-    MoleculeDatabase.loc[IDCounter, 'SMILES'] = MutMolSMILES
-    MoleculeDatabase.loc[IDCounter, 'MolObject'] = MutMol
-    MoleculeDatabase.loc[IDCounter, 'MutationList'] = MutationList
-    MoleculeDatabase.loc[IDCounter, 'HeavyAtoms'] = HeavyAtoms 
-    MoleculeDatabase.loc[IDCounter, 'ID'] = ID
-    MoleculeDatabase.loc[IDCounter, 'Charge'] = Charge
-    MoleculeDatabase.loc[IDCounter, 'MolMass'] = MolMass
-    MoleculeDatabase.loc[IDCounter, 'Predecessor'] = Predecessor
+    MoleculeDatabase.at[IDCounter, 'SMILES'] = MutMolSMILES
+    MoleculeDatabase.at[IDCounter, 'MolObject'] = MutMol
+    MoleculeDatabase.at[IDCounter, 'MutationList'] = MutationList
+    MoleculeDatabase.at[IDCounter, 'HeavyAtoms'] = HeavyAtoms 
+    MoleculeDatabase.at[IDCounter, 'ID'] = ID
+    MoleculeDatabase.at[IDCounter, 'Charge'] = Charge
+    MoleculeDatabase.at[IDCounter, 'MolMass'] = MolMass
+    MoleculeDatabase.at[IDCounter, 'Predecessor'] = Predecessor
 
     return MoleculeDatabase
 
-def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName):
+def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName, Agent):
     #Create an array job for each separate simulation
     if Generation == 1:
         BotValue = 0
@@ -1132,11 +1162,11 @@ def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName):
         TopValue = ListRange[-1]
         BotValue = ListRange[0]
 
-    if os.path.exists(f"{os.path.join(CWD, f'{SimName}.pbs')}"):
+    if os.path.exists(f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}"):
         print(f'Specified file already exists in this location, overwriting')
-        os.remove(f"{os.path.join(CWD, f'{SimName}.pbs')}")       
+        os.remove(f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}")       
 
-    with open(os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs'), 'w') as file:
+    with open(os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{Agent}_{SimName}.pbs'), 'w') as file:
         file.write(f"""#!/bin/bash
 #PBS -l select=1:ncpus=32:mem=62gb
 #PBS -l walltime=07:59:59
@@ -1148,7 +1178,7 @@ module load mpi/intel-2019.6.166
 cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/Generation_{Generation}/Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}
 mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
-    os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{SimName}.pbs')}", f"{os.path.join(CWD, f'{SimName}.pbs')}")
+    os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{Agent}_{SimName}.pbs')}", f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}")
 
 def GetDVI(DVisc40, DVisc100):
     """
@@ -1161,53 +1191,45 @@ def GetDVI(DVisc40, DVisc100):
     DVI = 220 - (7*(10**S))
     return DVI
 
-def GetKVI(DVisc40, DVisc100, Dens40, Dens100):
+def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     # Get Kinematic Viscosities
     KVisc40 = GetKVisc(DVisc40, Dens40)
     KVisc100 = GetKVisc(DVisc100, Dens100)
 
-    RefVals = pd.read_excel('VILookupTable.xlsx', index_col=None)
-    """
-    Perform Linear interpolation where necessary to calculate L and H values
-    As the intervals change throughout the range of reference values,
-    we will need to get the closest two values to input value before
-    performing the interpolation.
+    RefVals = pd.read_excel(os.path.join(STARTINGDIR, 'VILookupTable.xlsx'), index_col=None)
 
-    U = Kinematic Viscosity at 40C
-    Antilog(X) is just 10^X
-    """
+    if KVisc100 >= 2:
+        # Retrive L and H value
+        RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
+        RefVals_Sorted = RefVals.sort_values(by='Diffs')
+        NearVals = RefVals_Sorted.head(2)
 
-    # Retrive L and H value
-    RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
-    RefVals_Sorted = RefVals.sort_values(by='Diffs')
-    NearVals = RefVals_Sorted.head(2)
+        # Put KVI, L and H values into List to organise values for interpolation
+        KVIVals = sorted(NearVals['KVI'].tolist())
+        LVals = sorted(NearVals['L'].tolist())
+        HVals = sorted(NearVals['H'].tolist())
 
-    # Put KVI, L and H values into List to organise values for interpolation
-    KVIVals = sorted(NearVals['KVI'].tolist())
-    LVals = sorted(NearVals['L'].tolist())
-    HVals = sorted(NearVals['H'].tolist())
+        # Perform Interpolation,
+        InterLVal = LVals[0] + (((KVisc100 - KVIVals[0])*(LVals[1]-LVals[0])) / (KVIVals[1]-KVIVals[0]))
+        InterHVal = HVals[0] + (((KVisc100 - KVIVals[0])*(HVals[1]-HVals[0])) / (KVIVals[1]-KVIVals[0]))
 
-    # Perform Interpolation,
-    InterLVal = LVals[0] + (((KVisc100 - KVIVals[0])*(LVals[1]-LVals[0])) / (KVIVals[1]-KVIVals[0]))
-    InterHVal = HVals[0] + (((KVisc100 - KVIVals[0])*(HVals[1]-HVals[0])) / (KVIVals[1]-KVIVals[0]))
-
-    # Calculate KVI
-    # If U > H
-    if KVisc40 >= InterHVal:
-        VI = ((InterLVal - KVisc40)/(InterLVal - InterHVal)) * 100
-    # If H > U
-    elif InterHVal > KVisc40:
-        N = ((log10(InterHVal) - log10(KVisc40))/log10(KVisc100))
-        VI = (((10**N)-1)/0.00715) + 100
+        # Calculate KVI
+        # If U > H
+        if KVisc40 >= InterHVal:
+            VI = ((InterLVal - KVisc40)/(InterLVal - InterHVal)) * 100
+        # If H > U
+        elif InterHVal > KVisc40:
+            N = ((log10(InterHVal) - log10(KVisc40))/log10(KVisc100))
+            VI = (((10**N)-1)/0.00715) + 100
+        else:
+            print('VI Undefined for input Kinematic Viscosities')
+            VI = None
     else:
         print('VI Undefined for input Kinematic Viscosities')
         VI = None
-
     return VI
 
-# CWD = deepcopy(os.getcwd())
-# Name = 'Generation_12_Molecule_21'
-# DensityPath = f'{CWD}/eqmDensity_{Name}_T300FP1atm.out'
-# ViscosityPath = f'{CWD}/logGKvisc_{Name}_T300FP1atm.out'
 
-# Density = GetDens(DensityPath)
+def CheckUpdateMASTER():
+    pass
+
