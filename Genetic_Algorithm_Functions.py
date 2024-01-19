@@ -881,18 +881,18 @@ reset_timestep  	0
 neigh_modify 		every 1 delay 0 check yes
 
 # NVT at high temperature
-fix             	nvt{Temp}K all nvt temp {Temp}.0 {Temp}.0 100.0
+fix             	nvt1000K all nvt temp 1000.0 1000.0 100.0
 thermo			    $d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
-					append thermoNVT{Temp}K_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-# dump            	1 all custom $d NVT{Temp}K_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
+					append thermoNVT1000K_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
+# dump            	1 all custom $d NVT1000K_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
 # dump_modify     	1 sort id
 run            		250000
 # undump          	1
-unfix			    nvt{Temp}K
+unfix			    nvt1000K
 unfix               thermo_print
-write_restart   	NVT_{Name}_T${{T}}KP1atm.restart
+write_restart   	NVT_{Name}_T1000KP1atm.restart
 
 # NPT: Isothermal-isobaric ensemble to set the desired pressure; compute average density at that pressure
 fix 				NPT all npt temp ${{eqmT}} ${{eqmT}} 100.0 iso ${{eqmP}} ${{eqmP}} 25.0

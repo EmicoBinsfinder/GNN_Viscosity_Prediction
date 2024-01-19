@@ -33,9 +33,6 @@ CONSIDERATIONS
 
 - How to initialise and change population of fragments for remove fragments module
 
-- Maybe a way to store the history of mutations made to a molecule, so that we can adjust (reduce) probabilities of certain
-mutations occurring and reoccuring based on past events, increasing range of molecules chekced out.
-
 - Can we keep track of modifications, and track how each legal modification to impacts (i.e. increases or decreases)
 visosity/conductivity to determine which modifications are best
 
@@ -43,25 +40,9 @@ visosity/conductivity to determine which modifications are best
 
 - How to penalise long surviving molecules to encourage even greater diversity in later generations
 
-- How to know if something is a gas or liquid
-
-- Decide a protocol for adding branches top 
-
-- How to implement a validity check before evaluating the fitness of molecules in a generation and which validity checks
-to implement
-
-- How to replace
-
-- How to ensure that we are actually generating molecules that will be liquid at room temperature (how do we design 
-gaseous lubricants)
-
 - Need to decide best fingerprint for calculating molecular similarity
 
-- Make calls to initialise LAMMPS call and get viscosity value from the simulation
-
 - Varying (decreasing) elitism factor to further increase novelty of molecules
-
-- Add detailed history of molecule mutations (why would this be useful)
 
 """
 
@@ -76,14 +57,6 @@ def runcmd(cmd, verbose = False, *args, **kwargs):
         shell=True)
     
     return process
-
-# runcmd('module load anaconda3/personal')
-# runcmd('source activate HTVS')
-
-# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/scripts"')
-# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/moltemplate/moltemplate/moltemplate/"')
-
-# runcmd('export PATH="$PATH:/rds/general/user/eeo21/home/Packmol/packmol-20.14.2/"')
 
 ################# IMPORTS ###################
 import Genetic_Algorithm_Functions as GAF
@@ -152,7 +125,7 @@ Agent = 'Agent1'
 
 PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-#PYTHONPATH = 'python3'
+PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -198,9 +171,9 @@ while len(MoleculeDatabase) < GenerationSize:
 
             # Set feature definition file path to OPLS or LOPLS depending on user choice 
             if LOPLS:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
             else:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
             
             #Attempt to parameterise with OPLS
             GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -258,11 +231,9 @@ while len(MoleculeDatabase) < GenerationSize:
             # Generate list of molecules to simulate in this generation
             FirstGenSimList.append(Name)
             print(f'Final Molecule SMILES: {MutMolSMILES}') 
-            
             IDcounter +=1
-
+        
         except Exception as E:
-            print(E)
             continue     
     FirstGenerationAttempts += 1
 
@@ -281,10 +252,12 @@ if PYTHONPATH == 'python3':
 if PYTHONPATH == 'python3':
     GAF.runcmd(f'qsub {join(CWD, f"{Agent}_373K.lammps.pbs")}')
 
+os.chdir(STARTINGDIR)
+
 # Wait until array jobs have finished
 MoveOn = False
 while MoveOn == False:
-    # runcmd(f'qstat > sims.txt')
+    runcmd(f'qstat > sims.txt')
     sims = []
     with open(join(STARTINGDIR, 'sims.txt'), 'r') as file:
         next(file)
@@ -441,8 +414,6 @@ for generation in range(2, MaxGenerations + 1):
                 MutMolSMILES = result[2] # SMILES of mutated molecule
                 Predecessor = result[3] # Get history of last two mutations performed on candidate
 
-                print(f'Number of Heavy Atoms after mutation: {NumHeavyAtoms}')                
-
                 # Update previous mutations object
                 PreviousMutations.pop(0)
                 PreviousMutations.append(Mutation)
@@ -452,9 +423,9 @@ for generation in range(2, MaxGenerations + 1):
                 try: # Try to generate all necessary files to simulate molecule
                     # Set feature definition file path to OPLS or LOPLS depending on user choice 
                     if LOPLS:
-                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
                     else:
-                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
                     
                     # Return to starting directory
                     os.chdir(STARTINGDIR) 
@@ -464,7 +435,6 @@ for generation in range(2, MaxGenerations + 1):
 
                     #Get molecule charge
                     charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
-                    print(f'OPLS Molecule Charge is: {float(charge)}')
 
                     #If successful, generate a PDB of molecule to use with Packmol
                     GAF.GeneratePDB(MutMolSMILES, PATH=join(STARTINGDIR, f'{Name}.pdb'))
@@ -526,14 +496,22 @@ for generation in range(2, MaxGenerations + 1):
     #This is where we should call the simulation script
     CWD = join(STARTINGDIR, 'Molecules', f'Generation_{generation}')
     # Create array job for 40C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='313K.lammps', Agent=Agent)
+    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName=f"{Agent}_313K.lammps", Agent=Agent)
     # Create array job for 100C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName='373K.lammps', Agent=Agent)
+    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName=f"{Agent}_373K.lammps", Agent=Agent)
+
+    if PYTHONPATH == 'python3':
+        GAF.runcmd(f'qsub {join(CWD, f"{Agent}_313K.lammps.pbs")}')
+
+    if PYTHONPATH == 'python3':
+        GAF.runcmd(f'qsub {join(CWD, f"{Agent}_373K.lammps.pbs")}')
+
+    os.chdir(STARTINGDIR)
 
     # Wait until array jobs have finished
     MoveOn = False
     while MoveOn == False:
-        # runcmd(f'qstat > sims.txt')
+        runcmd(f'qstat > sims.txt')
         sims = []
         with open(join(STARTINGDIR, 'sims.txt'), 'r') as file:
             next(file)
