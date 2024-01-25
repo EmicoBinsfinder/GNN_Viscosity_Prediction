@@ -1122,9 +1122,10 @@ def GetDens(DensityFile):
     return Density
 
 def GetKVisc(DVisc, Dens):
-    # Convert from Pa.s to cP
-    cPVisc = DVisc * 1000
-    return cPVisc / Dens
+    try:
+        return DVisc / Dens
+    except:
+        return None
 
 def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, Charge, MolMass, Predecessor):
     MoleculeDatabase.at[IDCounter, 'SMILES'] = MutMolSMILES
@@ -1173,10 +1174,12 @@ def GetDVI(DVisc40, DVisc100):
     we could make our own relation and see how that 
     compares to KVI measurements 
     """
-
-    S = (-log10( (log10(DVisc40) + 1.2) / (log10(DVisc100) + 1.2) )) / (log10(175/235))
-    DVI = 220 - (7*(10**S))
-    return DVI
+    try:
+        S = (-log10( (log10(DVisc40) + 1.2) / (log10(DVisc100) + 1.2) )) / (log10(175/235))
+        DVI = 220 - (7*(10**S))
+        return DVI
+    except:
+        return None
 
 def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     # Get Kinematic Viscosities
@@ -1185,7 +1188,10 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
 
     RefVals = pd.read_excel(os.path.join(STARTINGDIR, 'VILookupTable.xlsx'), index_col=None)
 
-    if KVisc100 >= 2:
+    if KVisc100 == None:
+        VI = None
+
+    elif KVisc100 >= 2:
         # Retrive L and H value
         RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)
         RefVals_Sorted = RefVals.sort_values(by='Diffs')
@@ -1214,6 +1220,7 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     else:
         print('VI Undefined for input Kinematic Viscosities')
         VI = None
+    
     return VI
 
 
