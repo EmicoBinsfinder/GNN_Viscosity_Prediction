@@ -1003,12 +1003,6 @@ variable     		myPyz equal c_myP[6]
 fix             	3 all ave/time 1 1 1 v_myPxx v_myPyy v_myPzz v_myPxy v_myPxz v_myPyz ave one #file Stress_AVGOne111_{Name}_T${{T}}KP1atm.out
 fix             	4 all ave/time $s $p $d v_myPxx v_myPyy v_myPzz v_myPxy v_myPxz v_myPyz ave one file Stress_AVGOnespd_{Name}_T${{T}}KP1atm.out
 
-variable    kB equal 1.3806504e-23    # [J/K] Boltzmann
-variable    atm2Pa equal 101325.0
-variable    A2m equal 1.0e-10
-variable    fs2s equal 1.0e-15
-variable    convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}
-
 fix          SS all ave/correlate $s $p $d &
              v_myPxy v_myPxz v_myPyz type auto file S0St.dat ave running
 
