@@ -19,6 +19,7 @@ import pandas as pd
 import re
 import requests
 from math import log10
+import sys
 import os
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
@@ -500,7 +501,7 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
 #Change so that we can have at most 1 benzene molecule
-def InsertBenzene(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
+def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
 
     """
     Function to insert an aromatic atom into a starting molecule
@@ -653,14 +654,13 @@ def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondType
     elif Mutation == 'RemoveAtom':
         result = RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=showdiff)
 
-    else: 
-        #Mutation == 'AddFragment'
+    elif Mutation == 'AddFragment':
         InsertStyle = rnd(['Within', 'Egde'])
         result = AddFragment(StartingMolecule, rnd(Fragments), InsertStyle=InsertStyle, showdiff=showdiff)
     
-    # else:
-    #     InsertStyle = rnd(['Within', 'Egde'])
-    #     result = InsertBenzene(StartingMolecule, AromaticMolecule, showdiff=showdiff, InsertStyle=InsertStyle)
+    else:
+        InsertStyle = rnd(['Within', 'Egde'])
+        result = InsertAromatic(StartingMolecule, AromaticMolecule, showdiff=showdiff, InsertStyle=InsertStyle)
     
     return result
 
@@ -672,10 +672,11 @@ def CheckSubstruct(MutMol):
     DoubleBondOxygens = MutMol.HasSubstructMatch(Chem.MolFromSmarts('O=O'))
     DoubleCDoubleO = MutMol.HasSubstructMatch(Chem.MolFromSmarts('C=C=O'))    
     DoubleCDoubleC = MutMol.HasSubstructMatch(Chem.MolFromSmarts('C=C=C'))    
+    BridgeHead = MutMol.HasSubstructMatch(Chem.MolFromSmarts('c-c'))    
 
-    # Check for sequence of single or double bonded oxygens
-    if SingleBondOxygens or DoubleBondOxygens or DoubleCDoubleO or DoubleCDoubleC:
-        print('Sequential Oxygens Found, returning empty object')
+    # Check for sequence of single or double bonded oxygens or Bridgehead carbonds
+    if SingleBondOxygens or DoubleBondOxygens or DoubleCDoubleO or DoubleCDoubleC or BridgeHead:
+        print('Undesirable substructure found, returning empty object')
         return True
     else:
         return False
@@ -1048,7 +1049,7 @@ write_data          GKvisc_{Name}_T${{T}}KP1atm.data
 
 """)
         
-def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms):
+def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
     if result[0]!= None:
         #Get number of heavy atoms in mutated molecule
         NumHeavyAtoms = result[0].GetNumHeavyAtoms()
@@ -1071,6 +1072,17 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
         # Check for illegal substructures
         elif CheckSubstruct(result[0]):
             MutMol = None
+
+        # Check for number of Aromatic Rings
+        elif Chem.rdMolDescriptors.CalcNumAromaticRings(result[0]) > MaxAromRings:
+            print('Too many aromatic rings')
+            print(Chem.rdMolDescriptors.CalcNumAromaticRings(result[0]))
+            MutMol = None
+        
+        # Check for bridgehead atoms
+        elif Chem.rdMolDescriptors.CalcNumBridgeheadAtoms(result[0]) > 0:
+            print('Too many bridged aromatic rings')
+            MutMol = None
         
         else:
             MutMol = result[0]
@@ -1090,7 +1102,7 @@ def GetVisc(ViscosityFile):
         with open(f'{ViscosityFile}', 'r+') as file:
             content = file.readlines()
             for line in content:
-                if 'average viscosity' in line:
+                if 'Average viscosity' in line:
                     viscline = line.split(' ')
                     Viscosity = viscline[2]              
                
@@ -1114,25 +1126,6 @@ def GetDens(DensityFile):
         print('Value for Density not found')
         Density = 0
     return Density
-
-def GetVisc(ViscosityFile):
-    try:
-        with open(f'{ViscosityFile}', 'r+') as file:
-            content = file.readlines()
-            for line in content:
-                if 'Average viscosity' in line:
-                    viscline = line.split(' ')
-                    Viscosity = viscline[2]              
-            
-    except Exception as E:
-        print(E)
-        print('Value for Viscosity not found')
-
-    # finally:
-    #     if 'Viscosity' not in globals():
-    #         Viscosity = 0    
-    
-    return Viscosity
 
 def GetKVisc(DVisc, Dens):
     # Convert from Pa.s to cP
