@@ -99,12 +99,12 @@ def get_plot_params(logfile, Molecule, WORKINGDIR, Temp, showplot=False):
         if showplot:
             plt.show()
         
-        # Plot Visc evolution
+        # Plot Kappa evolution
         KappaPlt, Kplot = plt.subplots()
         Kplot.set_title(f'Thermal Conductivity - {Temp}')
         Kplot.set_ylabel('Thermal Conductivity (W/m$^2$)')
         Kplot.set_xlabel('Time (ns)')
-        Kplot.plot(step, visclist)
+        Kplot.plot(step, kappalist)
         Kplot.grid(color='grey', linestyle='--', linewidth=0.5)
         Kplot.grid(which="minor", linestyle='--', linewidth=0.2)
         plt.minorticks_on()
@@ -156,8 +156,8 @@ for Molecule in Molecules:
     MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = visc_100
     MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = KVisc40
     MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = KVisc100
-    MoleculeDatabase.at[IDNumber, 'ThermalConductivity40C'] = kappa_40
-    MoleculeDatabase.at[IDNumber, 'ThermalConductivity100C'] = kappa_100
+    MoleculeDatabase.at[IDNumber, 'ThermalConductivity_40C'] = kappa_40
+    MoleculeDatabase.at[IDNumber, 'ThermalConductivity_100C'] = kappa_100
     MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
     MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
 
