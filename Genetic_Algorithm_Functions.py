@@ -827,6 +827,7 @@ def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime):
     # Write LAMMPS file for 40C run
     with open(os.path.join(CWD, f'{Name}_system_{Temp}K.lammps'), 'x') as file:
         file.write(f"""
+
 # Setup parameters
 variable       		T equal {Temp} # Equilibrium temperature [K]
 log             	logEQM_{Name}_T${{T}}KP1atm.out
@@ -969,7 +970,7 @@ variable    		atm2Pa equal 101325.0
 variable    		A2m equal 1.0e-10 			
 variable    		fs2s equal 1.0e-15 			
 variable			Pas2cP equal 1.0e+3			
-variable    		convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}*${{Pas2cP}}
+variable    		convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}
 variable            convertWk equal ${{kCal2J}}*${{kCal2J}}/${{fs2s}}/${{A2m}}
 
 ##################################### Viscosity Calculation #####################################################
@@ -1015,32 +1016,43 @@ fix          JJ all ave/correlate $s $p $d &
              c_flux[1] c_flux[2] c_flux[3] type auto &
              file profile.heatflux ave running
 
+variable        scaleWk equal ${{convertWk}}/${{kB}}/$T/$T/$V*$s*${{dt}}
+variable        k11 equal trap(f_JJ[3])*${{scaleWk}}
+variable        k22 equal trap(f_JJ[4])*${{scaleWk}}
+variable        k33 equal trap(f_JJ[5])*${{scaleWk}}
 
-variable        scale equal ${{convertWk}}/${{kB}}/$T/$T/$V*$s*${{dt}}
-variable        k11 equal trap(f_JJ[3])*${{scale}}
-variable        k22 equal trap(f_JJ[4])*${{scale}}
-variable        k33 equal trap(f_JJ[5])*${{scale}}
+##### Diffusion Coefficient Calculations 
+
+compute         vacf all vacf   #Calculate velocity autocorrelation function
+fix             5 all vector 1 c_vacf[4]
+variable        vacf equal 0.33*${{dt}}*trap(f_5)
 
 thermo       		$d
-thermo_style custom step temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33 
-fix thermo_print all print $d "$(temp) $(press) $(v_myPxy) $(v_myPxz) $(v_myPyz) $(v_v11) $(v_v22) $(v_v33) $(vol) $(v_Jx) $(v_Jy) $(v_Jz) $(v_k11) $(v_k22) $(v_k33)" &
-    append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33"
+thermo_style custom step temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33 v_vacf
+
+fix thermo_print all print $d "$(temp) $(press) $(v_myPxy) $(v_myPxz) $(v_myPyz) $(v_v11) $(v_v22) $(v_v33) $(vol) $(v_Jx) $(v_Jy) $(v_Jz) $(v_k11) $(v_k22) $(v_k33) $(v_vacf)" &
+    append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33 v_vacf"
 
 # Dump all molecule coordinates
 
 # save thermal conductivity to file
 variable     kav equal (v_k11+v_k22+v_k33)/3.0
-fix          fxave all ave/time $d 1 $d v_kav file lamda.profile
+fix          fxave1 all ave/time $d 1 $d v_kav file lamda.txt
 
-#dump         1 all custom $d All_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
+# save viscosity to a file
+variable     visc equal (v_v11+v_v22+v_v33)/3.0
+fix          fxave2 all ave/time $d 1 $d v_visc file visc.txt
+
+# save diffusion coefficient to a file
+fix          fxave3 all ave/time $d 1 $d v_vacf file diff_coeff.txt
+
 run          {GKRuntime}
-variable     v equal (v_v11+v_v22+v_v33)/3.0
+
 variable     ndens equal count(all)/vol
-print        "Average viscosity: $v [Pa.s] @ $T K, ${{ndens}} atoms/A^3"
+print        "Average viscosity: ${{visc}} [Pa.s] @ $T K, ${{ndens}} atoms/A^3"
 
 write_restart   	GKvisc_{Name}_T${{T}}KP1atm.restart
 write_data          GKvisc_{Name}_T${{T}}KP1atm.data
-
 """)
         
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
@@ -1222,8 +1234,4 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
         VI = None
     
     return VI
-
-
-def CheckUpdateMASTER():
-    pass
 

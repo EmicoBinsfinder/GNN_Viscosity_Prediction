@@ -75,7 +75,7 @@ def get_plot_params(logfile, Molecule, WORKINGDIR, Temp, showplot=False):
                     k33.append(float(line[15]))
                     
                     # Get latest kappa and viscosity value
-                    visc = (float(line[6])*1000 + float(line[6])*1000 + float(line[6])*1000) / 3
+                    visc = (float(line[6])*1000 + float(line[7])*1000 + float(line[8])*1000) / 3
                     kappa = (float(line[13]) + float(line[14]) + float(line[15])) / 3
 
                     visclist.append(visc)
@@ -124,7 +124,7 @@ def get_plot_params(logfile, Molecule, WORKINGDIR, Temp, showplot=False):
     return visc_final, kappa_final, step
 
 # Plot Kappa evolution
-MoleculeDatabase = pd.read_csv('MoleculeDatabase.csv')
+MoleculeDatabase = pd.read_csv('MoleculeDatabaseOriginal.csv')
 
 WORKINGDIR = 'C:/Users/eeo21/Desktop/Molecules'
 STARTINGDIR = deepcopy(os.getcwd())
@@ -161,7 +161,7 @@ for Molecule in Molecules:
     MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
     MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
 
-MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv', index=False)
+MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase1.csv', index=False)
 print(MoleculeDatabase)
 
 # print(KVI)

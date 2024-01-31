@@ -43,7 +43,6 @@ visosity/conductivity to determine which modifications are best
 - Need to decide best fingerprint for calculating molecular similarity
 
 - Varying (decreasing) elitism factor to further increase novelty of molecules
-
 """
 
 ############### ENVIRONMENT SETUP ############
@@ -271,7 +270,7 @@ while MoveOn == False:
     # Check if array jobs have finished
     if len(sims) != 0:
         print('Waiting for 10 mins')
-        sleep(60)
+        sleep(600)
     else:
         MoveOn = True
 
