@@ -32,9 +32,7 @@ def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbos
     if len(Chem.GetMolFrags(Mut_Mol)) != 1:
         if Verbose:
             print('Fragmented result, trying new mutation')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
         if showdiff:
             view_difference(StartingMoleculeUnedited, Mut_Mol)
@@ -42,9 +40,7 @@ def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbos
     elif Mut_Mol_Sanitized != rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_NONE:
         if Verbose:
             print('Validity Check Failed')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
     else: 
         if Verbose:
@@ -67,7 +63,7 @@ def AddAtom(StartingMolecule, NewAtoms, BondTypes, showdiff=False, Verbose=False
         - NewAtoms: List of atoms that could be added to starting molecule
         - Show Difference: If True, shows illustration of changes to molecule
     """
-    StartingMoleculeUnedited = StartingMolecule
+    StartingMoleculeUnedited = deepcopy(StartingMolecule)
 
     try:
         # Change to an editable object
@@ -118,7 +114,7 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False, 
     4. Get bond and bondtype of atom to be replaced
     5. Create new bond of same type where atom was removed
     """
-    StartingMoleculeUnedited = StartingMolecule
+    StartingMoleculeUnedited = deepcopy(StartingMolecule)
 
     AtomIdxs = []
 
@@ -138,9 +134,7 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False, 
     if len(AtomIdxs) == 0:
         if Verbose:
             print('Empty Atom Index List')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
     
     else:
         #Select a random atom from the index of potential replacement atoms
@@ -179,7 +173,7 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=True, Verbose=False):
     4. Get index and bondtype of bond to be replaced
     """
 
-    StartingMoleculeUnedited = StartingMolecule
+    StartingMoleculeUnedited = deepcopy(StartingMolecule)
 
     BondIdxs = []
     for bond in StartingMoleculeUnedited.GetBonds():
@@ -215,9 +209,7 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=True, Verbose=False):
     else:
         if Verbose:
             print('Empty Bond Index List')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES, StartingMoleculeUnedited
 
@@ -414,6 +406,7 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
         c. Remove selected atom and create new bond of selected bond type between left over atoms 
     """
     StartingMoleculeUnedited = deepcopy(StartingMolecule)
+    print(StartingMolecule, StartingMoleculeUnedited)
 
     #try:
     # Store indexes of atoms in molecule
@@ -423,12 +416,8 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
     for atom in StartingMoleculeUnedited.GetAtoms():
         if len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
             print('Starting molecule is completely aromatic')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
             
-        #elif 
-
         else:
             AtomIdxs.append(atom.GetIdx())
 
@@ -502,10 +491,8 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
 
 #Change so that we can have at most 1 benzene molecule
 def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
-
     """
     Function to insert an aromatic atom into a starting molecule
-    
     4. If inserting aromatic ring:
     - Check if fragment is aromatic
     - Combine starting molecule and fragment into single disconnected Mol object 
@@ -522,7 +509,7 @@ def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', sho
 
     print(f'InsertStyle is: {InsertStyle}')
 
-    StartingMoleculeUnedited = StartingMolecule
+    StartingMoleculeUnedited = deepcopy(StartingMolecule)
     Fragment = AromaticMolecule
 
     #Always check if fragment or starting molecule is a cyclic (benzene) molecule
@@ -531,16 +518,12 @@ def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', sho
         if len(Fragment.GetAromaticAtoms()) != len(Fragment.GetAtoms()):
             if Verbose:
                 print('Fragment is not cyclic')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
         
         elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
             if Verbose:
                 print('Starting molecule is completely aromatic')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
         else:
             Chem.SanitizeMol(Fragment)
@@ -608,9 +591,7 @@ def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', sho
 
                 if len(OneBondAtomsMolecule) == 0:
                     print('No one-bonded terminal atoms in starting molecule, returning empty object')
-                    Mut_Mol = None
-                    Mut_Mol_Sanitized = None
-                    MutMolSMILES = None
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
                 
                 else:
                     # Randomly choose two unique atoms from aromatic molecule
@@ -627,14 +608,11 @@ def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', sho
                 
             else:
                 print('Edge case, returning empty objects')
-                Mut_Mol = None
-                Mut_Mol_Sanitized = None
-                MutMolSMILES = None
+                Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+
     except:
         print('Index error, starting molecule probably too short, trying different mutation')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 

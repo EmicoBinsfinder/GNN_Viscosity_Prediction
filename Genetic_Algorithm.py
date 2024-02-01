@@ -279,7 +279,7 @@ for Molecule in FirstGenSimList:
     try:
         # Create a function to wait until all simulations from this generation are finished
         Score = GAF.fitfunc(Molecule, Generation=1)
-        os.chdir(join(STARTINGDIR, 'Generation_1', Molecule))
+        os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1', Molecule))
         CWD = os.getcwd()
 
         #Get Densities
@@ -532,7 +532,7 @@ for generation in range(2, MaxGenerations + 1):
         try:
             # Create a function to wait until all simulations from this generation are finished
             Score = GAF.fitfunc(Molecule, Generation=generation)
-            os.chdir(join(STARTINGDIR, generation, Molecule))
+            os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}', Molecule))
             CWD = os.getcwd()
 
             #Get Densities
