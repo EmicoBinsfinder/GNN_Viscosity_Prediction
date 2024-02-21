@@ -161,8 +161,8 @@ for Molecule in Molecules:
     MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
     MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
 
-MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase1.csv', index=False)
-print(MoleculeDatabase)
+# MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase1.csv', index=False)
+# print(MoleculeDatabase)
 
 # print(KVI)
 # print(DVI)
