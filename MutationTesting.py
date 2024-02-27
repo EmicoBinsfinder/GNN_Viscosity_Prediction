@@ -106,10 +106,8 @@ AromaticAtoms = []
 for x in AromaticAtomsObject:
     AromaticAtoms.append(x.GetIdx())
 
-print(AromaticAtoms)
-
 # Choose whether to remove aromatic ring or not
-RemoveRing =  rnd([True, False])
+RemoveRing =  rnd([False, False])
 
 if RemoveRing and len(AromaticAtoms) > 0:
     try:
@@ -162,10 +160,31 @@ if RemoveRing and len(AromaticAtoms) > 0:
 else:
     StartingMoleculeAtoms = StartingMolecule.GetAtoms()
     AtomIdxs = [x.GetIdx() for x in StartingMoleculeAtoms if x.GetIdx() not in AromaticAtoms]
-    print(AtomIdxs)
-
     # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
 
+    UnwantedAtomIdxs = []
+    for AtIdx in AtomIdxs:
+        Check_Atom = StartingMolecule.GetAtomWithIdx(AtIdx)
+        Neighbors = Check_Atom.GetNeighbors()
+        for Neighbor in Neighbors:
+            if Neighbor.IsInRing() == True or len(Neighbors) <= 1:
+                UnwantedAtomIdxs.append(AtIdx)
+
+FinalAtomIdxs = [x for x in AtomIdxs if x not in UnwantedAtomIdxs]
+
+# Select two random bonds for fragmentation
+selected_atoms = random.sample(FinalAtomIdxs, 2)
+
+# Get bonds of selected atoms
+SeveringBonds = []
+for atomidx in selected_atoms:
+    atom = StartingMolecule.GetAtomWithIdx(atomidx)
+    BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
+    SeveringBonds.append(random.sample(FinalAtomIdxs, 1))
+
+SeveringBonds = [x[0] for x in SeveringBonds]
+
+StartingMolecule = Chem.FragmentOnBonds(StartingMolecule, (SeveringBonds[0], SeveringBonds[1]))
 
 # Add indexes to molecule for visualisation
 def mol_with_atom_index(mol):
@@ -173,7 +192,9 @@ def mol_with_atom_index(mol):
         atom.SetAtomMapNum(atom.GetIdx())
     return mol
 
-StartingMoleculeLabelled = mol_with_atom_index(StartingMolecule)
+# StartingMoleculeLabelled = mol_with_atom_index(StartingMolecule)
+
+# view_difference(StartingMoleculeUnedited, StartingMolecule)
 
 # Visualise molecule
 plotmol(StartingMolecule)
