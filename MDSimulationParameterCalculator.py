@@ -123,24 +123,24 @@ for Study in Studies:
 
         FinalViscList = []
         FinalKappaList = []
-        # DataframeVisc = pd.DataFrame()
-        # DataframeKappa = pd.DataFrame()
+        DataframeVisc = pd.DataFrame()
+        DataframeKappa = pd.DataFrame()
 
         for Run in RunFolders:
             System = f'{Study}/{Molecule}'
-            logfile = f'logGKvisc_{Molecule}_T313KP1atm.out'
-            visc, kappa, step, visclist, kappalist = get_plot_params(logfile, System, Run, WORKINGDIR, '313K', showplot=False)
-            Dens40C = GAF.GetDens(f'eqmDensity_{Molecule}_T313KP1atm.out')
+            logfile = f'logGKvisc_{Molecule}_T373KP1atm.out'
+            visc, kappa, step, visclist, kappalist = get_plot_params(logfile, System, Run, WORKINGDIR, '373K', showplot=False)
+            Dens40C = GAF.GetDens(f'eqmDensity_{Molecule}_T373KP1atm.out')
             FinalViscList.append(visc)
             FinalKappaList.append(kappa)
-        #     DataframeVisc[f'{System}_40C_Viscosity_{Run}'] = pd.Series(visclist)
-        #     DataframeKappa[f'{System}_40C_ThemalK_{Run}'] = pd.Series(kappalist)
+            DataframeVisc[f'{System}_40C_Viscosity_{Run}'] = pd.Series(visclist)
+            DataframeKappa[f'{System}_40C_ThemalK_{Run}'] = pd.Series(kappalist)
 
-        # DataframeVisc.to_csv(join(WORKINGDIR, System, 'DataVisc.csv'), index=False)
-        # DataframeKappa.to_csv(join(WORKINGDIR, System, 'DataKappa.csv'), index=False)
+        DataframeVisc.to_csv(join(WORKINGDIR, System, 'DataVisc373K.csv'), index=False)
+        DataframeKappa.to_csv(join(WORKINGDIR, System, 'DataKappa373K.csv'), index=False)
 
-        DataframeVisc = pd.read_csv(join(WORKINGDIR, System, 'DataVisc.csv'), index_col=False)
-        DataframeKappa = pd.read_csv(join(WORKINGDIR, System, 'DataKappa.csv'), index_col=False)
+        DataframeVisc = pd.read_csv(join(WORKINGDIR, System, 'DataVisc373K.csv'), index_col=False)
+        DataframeKappa = pd.read_csv(join(WORKINGDIR, System, 'DataKappa373K.csv'), index_col=False)
 
         # Remove incomplete experiments
         for column in DataframeVisc.columns:
@@ -182,7 +182,7 @@ for Study in Studies:
 
         # Plot Visc evolution
         ViscPlt, Vplot = plt.subplots()
-        Vplot.set_title(f'Viscosity Average- 313K {Study} {Molecule}')
+        Vplot.set_title(f'Viscosity Average- 373K {Study} {Molecule}')
         Vplot.set_ylabel('Viscosity (Cp)')
         Vplot.set_xlabel('Time (ns)')
         Vplot.plot(step, AvViscList)
@@ -191,12 +191,12 @@ for Study in Studies:
         Vplot.grid(which="minor", linestyle='--', linewidth=0.2)
         plt.minorticks_on()
         # Vplot.set_xlim(-0.05, 3)
-        plt.savefig(join(WORKINGDIR, f'{Study}',  f'AvViscPlot_{Molecule}_{Study}_313K.png'))
+        plt.savefig(join(WORKINGDIR, f'{Study}',  f'AvViscPlot_{Molecule}_{Study}_373K.png'))
         plt.close()
         
         # Plot Kappa evolution
         KappaPlt, Kplot = plt.subplots()
-        Kplot.set_title(f'Thermal Conductivity Average - 313K {Study} {Molecule}')
+        Kplot.set_title(f'Thermal Conductivity Average - 373K {Study} {Molecule}')
         Kplot.set_ylabel('Thermal Conductivity (W/m$^2$)')
         Kplot.set_xlabel('Time (ns)')
         Kplot.plot(step, AvKappaList)
@@ -205,7 +205,7 @@ for Study in Studies:
         Kplot.grid(which="minor", linestyle='--', linewidth=0.2)
         plt.minorticks_on()
         # Kplot.set_xlim(-0.05, 3)
-        plt.savefig(join(WORKINGDIR, f'{Study}', f'AvKappaPlot_{Molecule}_{Study}_313K.png'))
+        plt.savefig(join(WORKINGDIR, f'{Study}', f'AvKappaPlot_{Molecule}_{Study}_373K.png'))
         plt.close()
             
         print(f'{System} average viscosity = {np.average(FinalViscList)}')
@@ -228,20 +228,20 @@ for Molecule in Molecules:
 
         for Run in RunFolders:
             System = f'FiniteSizeEffects/{Molecule}/{NumMol}'
-            logfile = f'logGKvisc_{Molecule}_T313KP1atm.out'
-            visc, kappa, step, visclist, kappalist = get_plot_params(logfile, System, Run, WORKINGDIR, '313K', showplot=False)
-            Dens40C = GAF.GetDens(f'eqmDensity_{Molecule}_T313KP1atm.out')
+            logfile = f'logGKvisc_{Molecule}_T373KP1atm.out'
+            visc, kappa, step, visclist, kappalist = get_plot_params(logfile, System, Run, WORKINGDIR, '373K', showplot=False)
+            Dens40C = GAF.GetDens(f'eqmDensity_{Molecule}_T373KP1atm.out')
             FinalViscList.append(visc)
             FinalKappaList.append(kappa)
-        #     DataframeVisc[f'{System}_40C_Viscosity_{Run}'] = pd.Series(visclist)
-        #     DataframeKappa[f'{System}_40C_ThemalK_{Run}'] = pd.Series(kappalist)
+            DataframeVisc[f'{System}_40C_Viscosity_{Run}'] = pd.Series(visclist)
+            DataframeKappa[f'{System}_40C_ThemalK_{Run}'] = pd.Series(kappalist)
 
-        # DataframeVisc.to_csv(join(WORKINGDIR, System, 'DataVisc.csv'), index=False)
-        # DataframeKappa.to_csv(join(WORKINGDIR, System, 'DataKappa.csv'), index=False)
+        DataframeVisc.to_csv(join(WORKINGDIR, System, 'DataVisc373.csv'), index=False)
+        DataframeKappa.to_csv(join(WORKINGDIR, System, 'DataKappa373.csv'), index=False)
 
         # # Dataframe = Dataframe.dropna()
-        DataframeVisc = pd.read_csv(join(WORKINGDIR, System, 'DataVisc.csv'), index_col=False)
-        DataframeKappa = pd.read_csv(join(WORKINGDIR, System, 'DataKappa.csv'), index_col=False)
+        DataframeVisc = pd.read_csv(join(WORKINGDIR, System, 'DataVisc373.csv'), index_col=False)
+        DataframeKappa = pd.read_csv(join(WORKINGDIR, System, 'DataKappa373.csv'), index_col=False)
 
         # Remove incomplete experiments
         for column in DataframeVisc.columns:
@@ -283,7 +283,7 @@ for Molecule in Molecules:
 
         # Plot Visc evolution
         ViscPlt, Vplot = plt.subplots()
-        Vplot.set_title(f'Viscosity Average- 313K {NumMol} {Molecule}')
+        Vplot.set_title(f'Viscosity Average- 373K {NumMol} {Molecule}')
         Vplot.set_ylabel('Viscosity (Cp)')
         Vplot.set_xlabel('Time (ns)')
         Vplot.plot(step, AvViscList)
@@ -292,12 +292,12 @@ for Molecule in Molecules:
         Vplot.grid(which="minor", linestyle='--', linewidth=0.2)
         plt.minorticks_on()
         # Vplot.set_xlim(-0.05, 3)
-        plt.savefig(join(WORKINGDIR, 'FiniteSizeEffects', f'AvViscPlot_{Molecule}_{NumMol}_313K.png'))
+        plt.savefig(join(WORKINGDIR, 'FiniteSizeEffects', f'AvViscPlot_{Molecule}_{NumMol}_373K.png'))
         plt.close()
         
         # Plot Kappa evolution
         KappaPlt, Kplot = plt.subplots()
-        Kplot.set_title(f'Thermal Conductivity Average - 313K {NumMol} {Molecule}')
+        Kplot.set_title(f'Thermal Conductivity Average - 373K {NumMol} {Molecule}')
         Kplot.set_ylabel('Thermal Conductivity (W/m$^2$)')
         Kplot.set_xlabel('Time (ns)')
         Kplot.plot(step, AvKappaList)
@@ -306,7 +306,7 @@ for Molecule in Molecules:
         Kplot.grid(which="minor", linestyle='--', linewidth=0.2)
         plt.minorticks_on()
         # Kplot.set_xlim(-0.05, 3)
-        plt.savefig(join(WORKINGDIR, 'FiniteSizeEffects', f'AvKappaPlot_{Molecule}_{NumMol}_313K.png'))
+        plt.savefig(join(WORKINGDIR, 'FiniteSizeEffects', f'AvKappaPlot_{Molecule}_{NumMol}_373K.png'))
         plt.close()
             
         print(f'{System} average viscosity = {np.average(FinalViscList)}')
