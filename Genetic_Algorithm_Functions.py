@@ -243,22 +243,18 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
         """
     
     StartingMoleculeUnedited = StartingMolecule
-    Fragment = Fragment
 
     try:
         #Always check if fragment is a cyclic (benzene) molecule
         if len(Fragment.GetAromaticAtoms()) == len(Fragment.GetAtoms()):
             if Verbose:
                 print('Fragment aromatic, inappropriate function')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+
         elif len((StartingMoleculeUnedited.GetAromaticAtoms())) == len(StartingMoleculeUnedited.GetAtoms()):
             if Verbose:
                 print('Starting molecule is completely aromatic')
-            Mut_Mol = None
-            Mut_Mol_Sanitized = None
-            MutMolSMILES = None
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
         else:
             # Add fragment to Mol object of starting molecule
             StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)

@@ -91,7 +91,7 @@ def RemoveFragment(StartingMolecule, BondTypes, MaxIters= 20, showdiff=False, Ve
 
 Verbose = False
 
-StartingMoleculeUnedited = deepcopy(TestMoleculesMols[-1])
+StartingMoleculeUnedited = deepcopy(TestMoleculesMols[3])
 
 # Change Mol onject
 StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
@@ -140,6 +140,7 @@ if RemoveRing and len(AromaticAtoms) > 0:
         Sever the selected bonds from above
         Create single/double bond between two of the non-aromatic atoms in the AtomIdxs
         """
+
         for B in BondIdxs:
             StartingMolecule.RemoveBond(B[0].GetIdx(), B[1].GetIdx())
 
@@ -170,21 +171,54 @@ else:
             if Neighbor.IsInRing() == True or len(Neighbors) <= 1:
                 UnwantedAtomIdxs.append(AtIdx)
 
-FinalAtomIdxs = [x for x in AtomIdxs if x not in UnwantedAtomIdxs]
+    # Save indexes of atoms that are neither aromatic nor bonded to an aromatic atom
+    FinalAtomIdxs = [x for x in AtomIdxs if x not in UnwantedAtomIdxs]
 
-# Select two random bonds for fragmentation
-selected_atoms = random.sample(FinalAtomIdxs, 2)
+    # Select two random atoms for fragmentation
+    selected_atoms = random.sample(FinalAtomIdxs, 2)
 
-# Get bonds of selected atoms
-SeveringBonds = []
-for atomidx in selected_atoms:
-    atom = StartingMolecule.GetAtomWithIdx(atomidx)
-    BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
-    SeveringBonds.append(random.sample(FinalAtomIdxs, 1))
+    # Get bonds of selected atoms
+    SeveringBonds = []
+    ComboBonds = []
+    for atomidx in selected_atoms:
+        atom = StartingMolecule.GetAtomWithIdx(atomidx)
+        BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
+        SeveringBonds.append(random.sample(FinalAtomIdxs, 1))
+        # Save index of atom on other side of chosen bond that was severed 
 
-SeveringBonds = [x[0] for x in SeveringBonds]
+    SeveringBonds = [x[0] for x in SeveringBonds]
 
-StartingMolecule = Chem.FragmentOnBonds(StartingMolecule, (SeveringBonds[0], SeveringBonds[1]))
+    #with StartingMolecule as StartingMolecule:
+    for b_idx in SeveringBonds:
+        b = StartingMolecule.GetBondWithIdx(b_idx)
+        StartingMolecule.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+
+    frags = Chem.GetMolFrags(StartingMolecule)
+
+    # Only proceed if the removed fragment is less than a quarter the length of the molecule 
+    if len(frags)==3 and len(frags[1])<= len(StartingMoleculeUnedited.GetAtoms())*0.4:
+        Mol1 = frags[0]
+        Mol2 = frags[-1]
+
+        # Get rid of atoms in mol fragments that are aromatic or bonded to an aromatic 
+        #Need to get highest atom index in molecule that isn't in an aromatic ring
+
+        Mol1 = [x for x in Mol1 if x in FinalAtomIdxs]
+        Mol2 = [x for x in Mol2 if x in FinalAtomIdxs]
+
+        StartingMolecule = Chem.RWMol(StartingMolecule)
+        StartingMolecule.AddBond(Mol1[-1], Mol2[0], rnd(BondTypes))
+
+        mol_frags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+
+        #Return the largest fragment as the final molecule
+        plotmol(StartingMolecule)
+        StartingMolecule = max(mol_frags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+
+        MutMolSMILES = Chem.MolToSmiles(StartingMolecule)
+
+    else:
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
 # Add indexes to molecule for visualisation
 def mol_with_atom_index(mol):
@@ -192,14 +226,13 @@ def mol_with_atom_index(mol):
         atom.SetAtomMapNum(atom.GetIdx())
     return mol
 
-# StartingMoleculeLabelled = mol_with_atom_index(StartingMolecule)
+mol0 = mol_with_atom_index(StartingMoleculeUnedited)
+mol1 = mol_with_atom_index(StartingMolecule)
 
-# view_difference(StartingMoleculeUnedited, StartingMolecule)
+def mol_crossover():
+    pass
 
-# Visualise molecule
-plotmol(StartingMolecule)
 
-# Select two bond indexes to perform fragmentation at (to create three total fragments)
 
 
 
