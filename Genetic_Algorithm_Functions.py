@@ -648,6 +648,8 @@ def CheckSubstruct(MutMol):
     DoubleCDoubleC = MutMol.HasSubstructMatch(Chem.MolFromSmarts('C=C=C'))    
     BridgeHead = MutMol.HasSubstructMatch(Chem.MolFromSmarts('c-c'))    
 
+    ### Remove C=C bonds that aren't aromatic
+
     # Check for sequence of single or double bonded oxygens or Bridgehead carbonds
     if SingleBondOxygens or DoubleBondOxygens or DoubleCDoubleO or DoubleCDoubleC or BridgeHead:
         print('Undesirable substructure found, returning empty object')
