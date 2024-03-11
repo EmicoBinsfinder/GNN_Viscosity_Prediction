@@ -101,7 +101,7 @@ BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
 
 ###### Implementing Genetic Algorithm Using Functions Above
 
-Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment', 'InsertAromatic']
+Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment', 'InsertAromatic', 'RemoveFragment']
 
 # GENETIC ALGORITHM HYPERPARAMETERS
 Silent = True # Edit outputs to only print if this flag is False

@@ -382,6 +382,189 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
       
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
+def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
+    """
+    StartingMolecule: Mol
+
+    Steps to implement replace fragment function
+
+    Take in starting molecule
+    
+    Check which molecules are 
+
+    Perform random fragmentation of molecule by performing x random cuts
+        - Will need to keep hold of terminal ends of each molecule
+            * Do this by checking fragment for atoms with only one bonded atom 
+        - Will need to check fragment being removed does not completely mess up molecule
+    
+    Stitch remaning molecules back together by their terminal ends
+    
+    Will allow x attempts for this to happen before giving up on this mutation(?)
+    
+    Only implement this mutation when number of atoms exceeds a certain number e.g. 5/6 max mol length
+    
+    Max fragment removal length of 2/5 max mol length
+    """
+
+    try:
+        StartingMoleculeUnedited = deepcopy(InputMolecule)
+
+        # Change Mol onject
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+
+        # Get list of Bond Indexes
+        AtomIdxs = []
+
+        # Check if there are aromatic rings (RI = Ring Info object)
+        RI = StartingMolecule.GetRingInfo()
+        AromaticAtomsObject = StartingMolecule.GetAromaticAtoms()
+        AromaticAtoms = []
+        for x in AromaticAtomsObject:
+            AromaticAtoms.append(x.GetIdx())
+        
+        if len(AromaticAtoms) > 0:
+            # Choose whether to remove aromatic ring or not
+            RemoveRing =  rnd([True, False])
+        
+        else:
+            RemoveRing = False
+
+        if Verbose:
+            print(f'Attempting to remove aromatic ring: {RemoveRing}')
+
+        if RemoveRing and len(AromaticAtoms) > 0:
+            try:
+                ChosenRing = rnd(RI.AtomRings())
+                """
+                Once ring is chosen:
+                - Go through each atom in chosen aromatic ring
+                - Check the bonds of each atom to see if aromatic or not
+                - If bond is not aromatic check which atom in the bond was not aromatic
+                    *Save the atom and bond index of the non aromatic atom/bond
+                - If only one non-aromatic bond, just sever bond and return molecule
+                - If exactly two non-aromatic bonds, sever both then create bond between the terminal atoms
+                - If more than two non-aromatic atoms
+                    *Select two of the non-aromatic atoms and create a bond between them, if valence violated, discard attempt 
+                """
+                BondIdxs = []
+                AtomIdxs = []
+
+                for AtomIndex in ChosenRing:
+                    Atom = StartingMolecule.GetAtomWithIdx(AtomIndex) #Get indexes of atoms in chosen ring
+                    for Bond in Atom.GetBonds():
+                        if Bond.IsInRing() == False:
+                            BondAtoms = [Bond.GetBeginAtom(), Bond.GetEndAtom()] #Get atoms associated to non-ring bond
+                            BondIdxs.append(BondAtoms)
+                            for At in BondAtoms:
+                                if At.GetIsAromatic() == False:
+                                    AtomIdxs.append(At.GetIdx())
+                """
+                To remove fragment:
+                Sever the selected bonds from above
+                Create single/double bond between two of the non-aromatic atoms in the AtomIdxs
+                """
+
+                for B in BondIdxs:
+                    StartingMolecule.RemoveBond(B[0].GetIdx(), B[1].GetIdx())
+
+                if len(AtomIdxs) > 1:
+                    BondingAtoms = [AtomIdxs[0], AtomIdxs[1]]
+                    StartingMolecule.AddBond(BondingAtoms[0], BondingAtoms[1], rnd(BondTypes))
+
+                    #Return Largest fragment as final mutated molecule
+                    mol_frags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+                    StartingMolecule = max(mol_frags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+                    StartingMolecule = Chem.RWMol(StartingMolecule) #Need to convert back to editable mol to use with 'MolCheckandPlot'
+
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
+                                                            StartingMolecule, 
+                                                            showdiff)
+            except Exception as E:
+                if Verbose:
+                    print(E)
+                    print('Remove Aromatic ring failed, returning empty objects')
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+                else:
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+
+        else:
+            StartingMoleculeAtoms = StartingMolecule.GetAtoms()
+            AtomIdxs = [x.GetIdx() for x in StartingMoleculeAtoms if x.GetIdx() not in AromaticAtoms]
+            # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
+
+            UnwantedAtomIdxs = []
+            for AtIdx in AtomIdxs:
+                Check_Atom = StartingMolecule.GetAtomWithIdx(AtIdx)
+                Neighbors = Check_Atom.GetNeighbors()
+                for Neighbor in Neighbors:
+                    if Neighbor.IsInRing() == True or len(Neighbors) <= 1:
+                        UnwantedAtomIdxs.append(AtIdx)
+
+            # Save indexes of atoms that are neither aromatic nor bonded to an aromatic atom
+            FinalAtomIdxs = [x for x in AtomIdxs if x not in UnwantedAtomIdxs]
+
+            # Select two random atoms for fragmentation
+            selected_atoms = random.sample(FinalAtomIdxs, 2)
+
+            # Get bonds of selected atoms
+            SeveringBonds = []
+            ComboBonds = []
+            for atomidx in selected_atoms:
+                atom = StartingMolecule.GetAtomWithIdx(atomidx)
+                BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
+                SeveringBonds.append(random.sample(FinalAtomIdxs, 1))
+                # Save index of atom on other side of chosen bond that was severed 
+
+            SeveringBonds = [x[0] for x in SeveringBonds]
+
+            #with StartingMolecule as StartingMolecule:
+            for b_idx in SeveringBonds:
+                b = StartingMolecule.GetBondWithIdx(b_idx)
+                StartingMolecule.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
+
+            frags = Chem.GetMolFrags(StartingMolecule)
+
+            # Only proceed if the removed fragment is less than a quarter the length of the molecule 
+            if len(frags)==3 and len(frags[1]) <= len(StartingMoleculeUnedited.GetAtoms())*0.4 and len(frags[1]) >= 2:
+                Mol1 = frags[0]
+                Mol2 = frags[-1]
+
+                # Get rid of atoms in mol fragments that are aromatic or bonded to an aromatic 
+                #Need to get highest atom index in molecule that isn't in an aromatic ring
+
+                Mol1 = [x for x in Mol1 if x in FinalAtomIdxs]
+                Mol2 = [x for x in Mol2 if x in FinalAtomIdxs]
+
+                StartingMolecule = Chem.RWMol(StartingMolecule)
+                StartingMolecule.AddBond(Mol1[-1], Mol2[0], rnd(BondTypes))
+
+                mol_frags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+
+                #Return the largest fragment as the final molecule
+                StartingMolecule = max(mol_frags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+                StartingMolecule = Chem.RWMol(StartingMolecule) #Need to convert back to editable mol to use with 'MolCheckandPlot'
+
+                Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
+                                                                            StartingMolecule, 
+                                                                            showdiff)
+
+            else:
+                if Verbose:
+                    print('Remove fragment failed, returning empty objects')
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+                else:
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+
+    except Exception as E:
+        if Verbose:
+            print(E)
+            print('Remove fragment failed, returning empty objects')
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+        else:
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
+
 def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
     """
     Function to replace atom from a selected list of atoms from a starting molecule.
@@ -1211,3 +1394,12 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     
     return VI
 
+def plotmol(mol):
+    img = Draw.MolsToGridImage([mol], subImgSize=(800, 800))
+    img.show()
+
+# Add indexes to molecule for visualisation
+def mol_with_atom_index(mol):
+    for atom in mol.GetAtoms():
+        atom.SetAtomMapNum(atom.GetIdx())
+    return mol
