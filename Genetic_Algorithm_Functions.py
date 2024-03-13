@@ -213,7 +213,7 @@ def ReplaceBond(StartingMolecule, Bonds, showdiff=True, Verbose=False):
 
     return Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES, StartingMoleculeUnedited
 
-def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=True, Verbose=False):
+def AddFragment(StartingMolecule, Fragment, InsertStyle, showdiff=True, Verbose=False):
     """
     Function to add a fragment from a selected list of fragments to starting molecule.
     
@@ -333,15 +333,12 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
 
             elif InsertStyle == 'Edge':
                 # Choose whether fragment will be added to an aromatic or non-aromatic bond
-
                 FragAdd = rnd(['Aromatic', 'Non-Aromatic'])
 
                 if len(OneBondAtomsMolecule) == 0:
                     if Verbose:
                         print('No one-bonded terminal atoms in starting molecule, returning empty object')
-                    Mut_Mol = None
-                    Mut_Mol_Sanitized = None
-                    MutMolSMILES = None
+                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
                 elif FragAdd == 'Non-Aromatic' or len(AromaticAtomsMolecule) == 0: 
                     #Randomly choose atom from fragment (including aromatic)
@@ -370,15 +367,12 @@ def AddFragment(StartingMolecule, Fragment, InsertStyle = 'Within', showdiff=Tru
             else:
                 if Verbose:
                     print('Edge case, returning empty objects')
-                Mut_Mol = None
-                Mut_Mol_Sanitized = None
-                MutMolSMILES = None
-    except:
+                Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+    except Exception as E:
         if Verbose:
+            print(E)
             print('Index error, starting molecule probably too short, trying different mutation')
-        Mut_Mol = None
-        Mut_Mol_Sanitized = None
-        MutMolSMILES = None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
       
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
@@ -508,7 +502,6 @@ def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
 
             # Get bonds of selected atoms
             SeveringBonds = []
-            ComboBonds = []
             for atomidx in selected_atoms:
                 atom = StartingMolecule.GetAtomWithIdx(atomidx)
                 BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
@@ -517,7 +510,6 @@ def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
 
             SeveringBonds = [x[0] for x in SeveringBonds]
 
-            #with StartingMolecule as StartingMolecule:
             for b_idx in SeveringBonds:
                 b = StartingMolecule.GetBondWithIdx(b_idx)
                 StartingMolecule.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
@@ -815,6 +807,12 @@ def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondType
         InsertStyle = rnd(['Within', 'Egde'])
         result = AddFragment(StartingMolecule, rnd(Fragments), InsertStyle=InsertStyle, showdiff=showdiff)
     
+    elif Mutation == 'RemoveFragment':
+        pass
+
+    elif Mutation == 'Mol_Crossover':
+        pass
+
     else:
         InsertStyle = rnd(['Within', 'Egde'])
         result = InsertAromatic(StartingMolecule, AromaticMolecule, showdiff=showdiff, InsertStyle=InsertStyle)

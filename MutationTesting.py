@@ -61,197 +61,76 @@ TestMolecules = ['CCCCCO', 'CCCCCCCCCCCCCCOCC=O', 'COCCC=CCCCC=COC(C)C', 'C=COCC
 
 TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
 
-def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
+def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False):
+
     """
-    StartingMolecule: Mol
+    Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
 
-    Steps to implement replace fragment function
+    Randomly fragment each molecule 
 
-    Take in starting molecule
-    
-    Check which molecules are 
+    Create bond between randomly selected atoms on the molecule
 
-    Perform random fragmentation of molecule by performing x random cuts
-        - Will need to keep hold of terminal ends of each molecule
-            * Do this by checking fragment for atoms with only one bonded atom 
-        - Will need to check fragment being removed does not completely mess up molecule
-    
-    Stitch remaning molecules back together by their terminal ends
-    
-    Will allow x attempts for this to happen before giving up on this mutation
-    
-    Only implement this mutation when number of atoms exceeds a certain number e.g. 5/6 max mol length
-    
-    Max fragment removal length of 2/5 max mol length
+    Need to make sure that we are not bonding an aromatic to an aromatic
+
     """
+    StartingMolecule = rnd(TestMoleculesMols)
+    StartingMoleculeUnedited = deepcopy(StartingMolecule)
+    CrossMolecule = rnd(CrossMolList)
+    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+    CrossMolecule = Chem.RWMol(CrossMolecule)
 
-    try:
-        StartingMoleculeUnedited = deepcopy(InputMolecule)
+    # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
+    #StartMol
+    StartMolRI = StartingMolecule.GetRingInfo()
+    StartMolAromaticBonds = StartMolRI.BondRings()
+    StartMolAromaticBondsList = []
+    for tup in StartMolAromaticBonds:
+        for bond in tup:
+            StartMolAromaticBondsList.append(int(bond))
 
-        # Change Mol onject
-        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+    StartMolBondIdxs = [int(x.GetIdx()) for x in StartingMolecule.GetBonds()]
 
-        # Get list of Bond Indexes
-        AtomIdxs = []
+    StartMolBondIdxsFinal = [x for x in StartMolBondIdxs if x not in StartMolAromaticBondsList]
+    StartMolSelectedBond = StartingMolecule.GetBondWithIdx(rnd(StartMolBondIdxsFinal))
 
-        # Check if there are aromatic rings (RI = Ring Info object)
-        RI = StartingMolecule.GetRingInfo()
-        AromaticAtomsObject = StartingMolecule.GetAromaticAtoms()
-        AromaticAtoms = []
-        for x in AromaticAtomsObject:
-            AromaticAtoms.append(x.GetIdx())
-        
-        if len(AromaticAtoms) > 0:
-            # Choose whether to remove aromatic ring or not
-            RemoveRing =  rnd([True, False])
-        
-        else:
-            RemoveRing = False
+    StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
+    StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+    StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
 
-        if Verbose:
-            print(f'Attempting to remove aromatic ring: {RemoveRing}')
+    #CrossMol
+    CrossMolRI = CrossMolecule.GetRingInfo()
+    CrossMolAromaticBonds = CrossMolRI.BondRings()
+    CrossMolAromaticBondsList = []
+    for tup in CrossMolAromaticBonds:
+        for bond in tup:
+            CrossMolAromaticBondsList.append(int(bond))
 
-        if RemoveRing and len(AromaticAtoms) > 0:
-            try:
-                ChosenRing = rnd(RI.AtomRings())
-                """
-                Once ring is chosen:
-                - Go through each atom in chosen aromatic ring
-                - Check the bonds of each atom to see if aromatic or not
-                - If bond is not aromatic check which atom in the bond was not aromatic
-                    *Save the atom and bond index of the non aromatic atom/bond
-                - If only one non-aromatic bond, just sever bond and return molecule
-                - If exactly two non-aromatic bonds, sever both then create bond between the terminal atoms
-                - If more than two non-aromatic atoms
-                    *Select two of the non-aromatic atoms and create a bond between them, if valence violated, discard attempt 
-                """
-                BondIdxs = []
-                AtomIdxs = []
+    CrossMolBondIdxs = [int(x.GetIdx()) for x in CrossMolecule.GetBonds()]
 
-                for AtomIndex in ChosenRing:
-                    Atom = StartingMolecule.GetAtomWithIdx(AtomIndex) #Get indexes of atoms in chosen ring
-                    for Bond in Atom.GetBonds():
-                        if Bond.IsInRing() == False:
-                            BondAtoms = [Bond.GetBeginAtom(), Bond.GetEndAtom()] #Get atoms associated to non-ring bond
-                            BondIdxs.append(BondAtoms)
-                            for At in BondAtoms:
-                                if At.GetIsAromatic() == False:
-                                    AtomIdxs.append(At.GetIdx())
-                """
-                To remove fragment:
-                Sever the selected bonds from above
-                Create single/double bond between two of the non-aromatic atoms in the AtomIdxs
-                """
+    CrossMolBondIdxsFinal = [x for x in CrossMolBondIdxs if x not in CrossMolAromaticBondsList]
+    CrossMolSelectedBond = CrossMolecule.GetBondWithIdx(rnd(CrossMolBondIdxsFinal))
 
-                for B in BondIdxs:
-                    StartingMolecule.RemoveBond(B[0].GetIdx(), B[1].GetIdx())
+    CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
+    CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
+    CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
 
-                if len(AtomIdxs) > 1:
-                    BondingAtoms = [AtomIdxs[0], AtomIdxs[1]]
-                    StartingMolecule.AddBond(BondingAtoms[0], BondingAtoms[1], rnd(BondTypes))
+    InsertStyle = rnd(['Within', 'Egde'])
 
-                    #Return Largest fragment as final mutated molecule
-                    mol_frags = Chem.GetMolFrags(StartingMolecule, asMols=True)
-                    StartingMolecule = max(mol_frags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
-                    StartingMolecule = Chem.RWMol(StartingMolecule) #Need to convert back to editable mol to use with 'MolCheckandPlot'
+    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
+                                                                                        CrossMolecule, 
+                                                                                        InsertStyle, 
+                                                                                        showdiff=False, 
+                                                                                        Verbose=True)
+    
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
-                                                            StartingMolecule, 
-                                                            showdiff)
-            except Exception as E:
-                if Verbose:
-                    print(E)
-                    print('Remove Aromatic ring failed, returning empty objects')
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-                else:
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+plotmol(Mut_Mol)
+plotmol(CrossMolecule)
+plotmol(StartingMoleculeUnedited)
 
-        else:
-            StartingMoleculeAtoms = StartingMolecule.GetAtoms()
-            AtomIdxs = [x.GetIdx() for x in StartingMoleculeAtoms if x.GetIdx() not in AromaticAtoms]
-            # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
-
-            UnwantedAtomIdxs = []
-            for AtIdx in AtomIdxs:
-                Check_Atom = StartingMolecule.GetAtomWithIdx(AtIdx)
-                Neighbors = Check_Atom.GetNeighbors()
-                for Neighbor in Neighbors:
-                    if Neighbor.IsInRing() == True or len(Neighbors) <= 1:
-                        UnwantedAtomIdxs.append(AtIdx)
-
-            # Save indexes of atoms that are neither aromatic nor bonded to an aromatic atom
-            FinalAtomIdxs = [x for x in AtomIdxs if x not in UnwantedAtomIdxs]
-
-            # Select two random atoms for fragmentation
-            selected_atoms = random.sample(FinalAtomIdxs, 2)
-
-            # Get bonds of selected atoms
-            SeveringBonds = []
-            ComboBonds = []
-            for atomidx in selected_atoms:
-                atom = StartingMolecule.GetAtomWithIdx(atomidx)
-                BondIdxs = [x.GetIdx() for x in atom.GetBonds()]
-                SeveringBonds.append(random.sample(FinalAtomIdxs, 1))
-                # Save index of atom on other side of chosen bond that was severed 
-
-            SeveringBonds = [x[0] for x in SeveringBonds]
-
-            #with StartingMolecule as StartingMolecule:
-            for b_idx in SeveringBonds:
-                b = StartingMolecule.GetBondWithIdx(b_idx)
-                StartingMolecule.RemoveBond(b.GetBeginAtomIdx(), b.GetEndAtomIdx())
-
-            frags = Chem.GetMolFrags(StartingMolecule)
-
-            # Only proceed if the removed fragment is less than a quarter the length of the molecule 
-            if len(frags)==3 and len(frags[1]) <= len(StartingMoleculeUnedited.GetAtoms())*0.4 and len(frags[1]) >= 2:
-                Mol1 = frags[0]
-                Mol2 = frags[-1]
-
-                # Get rid of atoms in mol fragments that are aromatic or bonded to an aromatic 
-                #Need to get highest atom index in molecule that isn't in an aromatic ring
-
-                Mol1 = [x for x in Mol1 if x in FinalAtomIdxs]
-                Mol2 = [x for x in Mol2 if x in FinalAtomIdxs]
-
-                StartingMolecule = Chem.RWMol(StartingMolecule)
-                StartingMolecule.AddBond(Mol1[-1], Mol2[0], rnd(BondTypes))
-
-                mol_frags = Chem.GetMolFrags(StartingMolecule, asMols=True)
-
-                #Return the largest fragment as the final molecule
-                StartingMolecule = max(mol_frags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
-                StartingMolecule = Chem.RWMol(StartingMolecule) #Need to convert back to editable mol to use with 'MolCheckandPlot'
-
-                Mut_Mol, Mut_Mol_Sanitized,  MutMolSMILES = MolCheckandPlot(StartingMoleculeUnedited, 
-                                                                            StartingMolecule, 
-                                                                            showdiff)
-
-            else:
-                if Verbose:
-                    print('Remove fragment failed, returning empty objects')
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-                else:
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-
-    except Exception as E:
-        if Verbose:
-            print(E)
-            print('Remove fragment failed, returning empty objects')
-            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-        else:
-            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-
-    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
-
-
-for x in TestMoleculesMols:
-    Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES = RemoveFragment(x, BondTypes, showdiff=False, Verbose=False)
-    if Mut_Mol != None:
-        plotmol(Mut_Mol)
-
-def mol_crossover():
-    pass
-
+# for x in TestMoleculesMols:
+#     Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES = RemoveFragment(x, BondTypes, showdiff=False, Verbose=False)
+#     if Mut_Mol != None:
+#         plotmol(Mut_Mol)
 
 

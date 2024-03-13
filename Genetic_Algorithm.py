@@ -110,7 +110,7 @@ IDcounter = 0
 FirstGenerationAttempts = 0
 GenerationMolecules = []
 FirstGenSimList = []
-MaxNumHeavyAtoms = 50
+MaxNumHeavyAtoms = 60
 MinNumHeavyAtoms = 5
 showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
@@ -386,7 +386,7 @@ for generation in range(2, MaxGenerations + 1):
             Name = f'Generation_{generation}_Molecule_{IDcounter}'
 
             if NumHeavyAtoms > 42:
-                MutationList = ['RemoveAtom', 'ReplaceAtom', 'ReplaceBond']
+                MutationList = ['RemoveAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveFragment', 'Mol_Crossover']
             else:
                 MutationList = Mutations 
             
