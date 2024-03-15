@@ -62,75 +62,81 @@ TestMolecules = ['CCCCCO', 'CCCCCCCCCCCCCCOCC=O', 'COCCC=CCCCC=COC(C)C', 'C=COCC
 TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
 
 def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False):
+    try:
+        """
+        Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
 
-    """
-    Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
+        Randomly fragment each molecule 
 
-    Randomly fragment each molecule 
+        Create bond between randomly selected atoms on the molecule
 
-    Create bond between randomly selected atoms on the molecule
+        Need to make sure that we are not bonding an aromatic to an aromatic
 
-    Need to make sure that we are not bonding an aromatic to an aromatic
+        Write code to save which molecule was crossed over with
+        """
+        StartingMolecule = rnd(TestMoleculesMols)
+        StartingMoleculeUnedited = deepcopy(StartingMolecule)
+        CrossMolecule = rnd(CrossMolList)
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+        CrossMolecule = Chem.RWMol(CrossMolecule)
 
-    """
-    StartingMolecule = rnd(TestMoleculesMols)
-    StartingMoleculeUnedited = deepcopy(StartingMolecule)
-    CrossMolecule = rnd(CrossMolList)
-    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-    CrossMolecule = Chem.RWMol(CrossMolecule)
+        # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
+        #StartMol
+        StartMolRI = StartingMolecule.GetRingInfo()
+        StartMolAromaticBonds = StartMolRI.BondRings()
+        StartMolAromaticBondsList = []
+        for tup in StartMolAromaticBonds:
+            for bond in tup:
+                StartMolAromaticBondsList.append(int(bond))
 
-    # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
-    #StartMol
-    StartMolRI = StartingMolecule.GetRingInfo()
-    StartMolAromaticBonds = StartMolRI.BondRings()
-    StartMolAromaticBondsList = []
-    for tup in StartMolAromaticBonds:
-        for bond in tup:
-            StartMolAromaticBondsList.append(int(bond))
+        StartMolBondIdxs = [int(x.GetIdx()) for x in StartingMolecule.GetBonds()]
 
-    StartMolBondIdxs = [int(x.GetIdx()) for x in StartingMolecule.GetBonds()]
+        StartMolBondIdxsFinal = [x for x in StartMolBondIdxs if x not in StartMolAromaticBondsList]
+        StartMolSelectedBond = StartingMolecule.GetBondWithIdx(rnd(StartMolBondIdxsFinal))
 
-    StartMolBondIdxsFinal = [x for x in StartMolBondIdxs if x not in StartMolAromaticBondsList]
-    StartMolSelectedBond = StartingMolecule.GetBondWithIdx(rnd(StartMolBondIdxsFinal))
+        StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
+        StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+        StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
 
-    StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
-    StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
-    StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+        #CrossMol
+        CrossMolRI = CrossMolecule.GetRingInfo()
+        CrossMolAromaticBonds = CrossMolRI.BondRings()
+        CrossMolAromaticBondsList = []
+        for tup in CrossMolAromaticBonds:
+            for bond in tup:
+                CrossMolAromaticBondsList.append(int(bond))
 
-    #CrossMol
-    CrossMolRI = CrossMolecule.GetRingInfo()
-    CrossMolAromaticBonds = CrossMolRI.BondRings()
-    CrossMolAromaticBondsList = []
-    for tup in CrossMolAromaticBonds:
-        for bond in tup:
-            CrossMolAromaticBondsList.append(int(bond))
+        CrossMolBondIdxs = [int(x.GetIdx()) for x in CrossMolecule.GetBonds()]
 
-    CrossMolBondIdxs = [int(x.GetIdx()) for x in CrossMolecule.GetBonds()]
+        CrossMolBondIdxsFinal = [x for x in CrossMolBondIdxs if x not in CrossMolAromaticBondsList]
+        CrossMolSelectedBond = CrossMolecule.GetBondWithIdx(rnd(CrossMolBondIdxsFinal))
 
-    CrossMolBondIdxsFinal = [x for x in CrossMolBondIdxs if x not in CrossMolAromaticBondsList]
-    CrossMolSelectedBond = CrossMolecule.GetBondWithIdx(rnd(CrossMolBondIdxsFinal))
+        CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
+        CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
+        CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
 
-    CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
-    CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
-    CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
+        InsertStyle = rnd(['Within', 'Egde'])
 
-    InsertStyle = rnd(['Within', 'Egde'])
-
-    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
-                                                                                        CrossMolecule, 
-                                                                                        InsertStyle, 
-                                                                                        showdiff=False, 
-                                                                                        Verbose=True)
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
+                                                                                            CrossMolecule, 
+                                                                                            InsertStyle, 
+                                                                                            showdiff, 
+                                                                                            Verbose)
     
+    except:
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = None, None, None, None
+
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
-plotmol(Mut_Mol)
-plotmol(CrossMolecule)
-plotmol(StartingMoleculeUnedited)
 
-# for x in TestMoleculesMols:
-#     Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES = RemoveFragment(x, BondTypes, showdiff=False, Verbose=False)
-#     if Mut_Mol != None:
-#         plotmol(Mut_Mol)
+for x in TestMoleculesMols:
+    print(x)
+    Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = Mol_Crossover(x,
+                                                                                         TestMoleculesMols, 
+                                                                                         showdiff=False, 
+                                                                                         Verbose=False)
+    if Mut_Mol != None:
+        plotmol(Mut_Mol)
+        plotmol(StartingMoleculeUnedited)
 
 
