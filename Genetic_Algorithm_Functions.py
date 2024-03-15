@@ -557,6 +557,72 @@ def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
+def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False):
+    try:
+        """
+        Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
+
+        Randomly fragment each molecule 
+
+        Create bond between randomly selected atoms on the molecule
+
+        Need to make sure that we are not bonding an aromatic to an aromatic
+
+        Write code to save which molecule was crossed over with
+        """
+        StartingMoleculeUnedited = deepcopy(StartingMolecule)
+        CrossMolecule = rnd(CrossMolList)
+        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+        CrossMolecule = Chem.RWMol(CrossMolecule)
+
+        # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
+        #StartMol
+        StartMolRI = StartingMolecule.GetRingInfo()
+        StartMolAromaticBonds = StartMolRI.BondRings()
+        StartMolAromaticBondsList = []
+        for tup in StartMolAromaticBonds:
+            for bond in tup:
+                StartMolAromaticBondsList.append(int(bond))
+
+        StartMolBondIdxs = [int(x.GetIdx()) for x in StartingMolecule.GetBonds()]
+
+        StartMolBondIdxsFinal = [x for x in StartMolBondIdxs if x not in StartMolAromaticBondsList]
+        StartMolSelectedBond = StartingMolecule.GetBondWithIdx(rnd(StartMolBondIdxsFinal))
+
+        StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
+        StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
+        StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+
+        #CrossMol
+        CrossMolRI = CrossMolecule.GetRingInfo()
+        CrossMolAromaticBonds = CrossMolRI.BondRings()
+        CrossMolAromaticBondsList = []
+        for tup in CrossMolAromaticBonds:
+            for bond in tup:
+                CrossMolAromaticBondsList.append(int(bond))
+
+        CrossMolBondIdxs = [int(x.GetIdx()) for x in CrossMolecule.GetBonds()]
+
+        CrossMolBondIdxsFinal = [x for x in CrossMolBondIdxs if x not in CrossMolAromaticBondsList]
+        CrossMolSelectedBond = CrossMolecule.GetBondWithIdx(rnd(CrossMolBondIdxsFinal))
+
+        CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
+        CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
+        CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
+
+        InsertStyle = rnd(['Within', 'Egde'])
+
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
+                                                                                            CrossMolecule, 
+                                                                                            InsertStyle, 
+                                                                                            showdiff, 
+                                                                                            Verbose)
+    
+    except:
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = None, None, None, None
+
+    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
+
 def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
     """
     Function to replace atom from a selected list of atoms from a starting molecule.
