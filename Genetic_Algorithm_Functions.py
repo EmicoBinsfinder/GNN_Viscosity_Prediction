@@ -612,7 +612,7 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
 
         InsertStyle = rnd(['Within', 'Egde'])
 
-        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = AddFragment(StartingMolecule, 
                                                                                             CrossMolecule, 
                                                                                             InsertStyle, 
                                                                                             showdiff, 
