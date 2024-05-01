@@ -28,7 +28,7 @@ from Genetic_Algorithm_Functions import CheckSubstruct
 from MoleculeDifferenceViewer import view_difference
 
 ### Fragments
-fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C', 'c1ccccc1']
+fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C', 'CCCCCc1ccccc1']
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
 
 ### ATOM NUMBERS
@@ -55,12 +55,11 @@ os.chdir(STARTINGDIR)
 RingDataset = pd.read_csv(join(STARTINGDIR, 'MoleculeDatabaseTest.csv'))
 RingDataset = pd.read_csv(join(STARTINGDIR, 'MoleculeDatabaseTestNoRings.csv'))
 
-TestMolecules = ['CCCCCO', 'CCCCCCCCCCCCCCOCC=O', 'COCCC=CCCCC=COC(C)C', 'C=COCCC(=O)CCCCCCCOCCCC(=C)C=CCCCCOCCCC', 'CC=COCCC=CC=CCCCCCCCCCCCCC(C)CO',
-                 'C=C(C)C=Cc1cccc(C)c1', 'CCc1ccccc1C=C(C)OC', 'OCCc1cccc(CCCCCC(O)O)c1', 'Cc1ccccc1OC(C)c1ccc(CO)cc1', 'C=Cc1cccc(CC(O)c2cccc(CCCOC=CCCOCO)c2)c1']
+TestMolecules = ['CCCCCc1ccccc1', 'CCCC(CCCC)CCCC']
 
 TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
 
-def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False):
+def Mol_Crossover(StartingMolecule, CrossMol, showdiff=False, Verbose=False):
     try:
         """
         Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
@@ -73,9 +72,9 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
 
         Write code to save which molecule was crossed over with
         """
-        StartingMolecule = rnd(TestMoleculesMols)
+        StartingMolecule = StartingMolecule
         StartingMoleculeUnedited = deepcopy(StartingMolecule)
-        CrossMolecule = rnd(CrossMolList)
+        CrossMolecule = CrossMol
         StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
         CrossMolecule = Chem.RWMol(CrossMolecule)
 
@@ -96,6 +95,8 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
         StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
         StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
         StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
+        print(Chem.MolToSmiles(StartingMolecule))
+
 
         #CrossMol
         CrossMolRI = CrossMolecule.GetRingInfo()
@@ -113,6 +114,7 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
         CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
         CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
         CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
+        print(Chem.MolToSmiles(CrossMol))
 
         InsertStyle = rnd(['Within', 'Egde'])
 
@@ -121,21 +123,32 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
                                                                                             InsertStyle, 
                                                                                             showdiff, 
                                                                                             Verbose)
+        
+
     
-    except:
+    except Exception as E:
+        print(E)
         Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = None, None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
+# for x in TestMoleculesMols:
+#     print(x)
 
-for x in TestMoleculesMols:
-    print(x)
-    Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = Mol_Crossover(x,
-                                                                                         TestMoleculesMols, 
-                                                                                         showdiff=False, 
-                                                                                         Verbose=False)
-    if Mut_Mol != None:
-        plotmol(Mut_Mol)
-        plotmol(StartingMoleculeUnedited)
+Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = Mol_Crossover(TestMoleculesMols[0],
+                                                                                    TestMoleculesMols[1], 
+                                                                                    showdiff=False, 
+                                                                                    Verbose=False)
+
+print(Mut_Mol_SMILES)
+
+Mut_Mol1, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited1 = GAF.ReplaceAtom(Mut_Mol, Atoms, fromAromatic=False, showdiff=False)
+
+print(Mut_Mol_SMILES)
+
+if Mut_Mol != None:
+    plotmol(Mut_Mol)
+    plotmol(Mut_Mol1)
+    plotmol(StartingMoleculeUnedited)
 
 
