@@ -14,6 +14,7 @@ import json
 import gzip
 import six
 import gt4sd
+from rdkit.Chem import rdFingerprintGenerator
 
 import os
 project_root = os.path.dirname(os.path.dirname(__file__))
@@ -108,20 +109,5 @@ class SCScorer():
                 self.vars = json.loads(json_str)
                 self.vars = [np.array(x) for x in self.vars]
 
-## Calling the SCScore model
-model = SCScorer()
-model.restore(os.path.join('C:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.json.gz'))
-smis = ['CCCOC(CC=O)C=CCCOCC=CCCCCC=CCCC=CCC(C=Cc1ccccc1)']
-for smi in smis:
-    (smi, sco) = model.get_score_from_smi(smi)
-    print('%.4f <--- %s' % (sco, smi))
 
-## Calculating Tanimotpo Similarity using molecular fingerprints
-from rdkit import DataStructs
-ms = [Chem.MolFromSmiles('CCOC'), Chem.MolFromSmiles('CCO'),
-Chem.MolFromSmiles('COC')]
-fpgen = AllChem.GetRDKitFPGenerator()
-fps = [fpgen.GetFingerprint(x) for x in ms]
-DataStructs.TanimotoSimilarity(fps[0],fps[1])
 
-## 

@@ -22,7 +22,7 @@ from math import log10
 import sys
 import os
 from rdkit import DataStructs
-
+from rdkit.Chem import rdFingerprintGenerator
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
     
@@ -1472,6 +1472,16 @@ def mol_with_atom_index(mol):
     return mol
 
 class SCScorer():
+    
+    #Model Parameters
+    project_root = os.path.dirname(os.path.dirname(__file__))
+
+    score_scale = 5.0
+    min_separation = 0.25
+
+    FP_len = 1024
+    FP_rad = 2
+
     def __init__(self, score_scale=score_scale):
         self.vars = []
         self.score_scale = score_scale
@@ -1567,16 +1577,26 @@ def SCScore(SMILESList):
     
     return SCScoreList
 
-
 def Toxicity(SMILESList):
     from gt4sd.properties import PropertyPredictorRegistry
     tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
-    for SMILES in SMILESList
-        result = tox21('CCO')
+    for SMILES in SMILESList:
+        result = tox21(SMILES)
     pass
 
 def TanimotoSimilarity(SMILESList):
-    pass
+    # Calculate Tanimoto Similarity between target molecule and every other molecule in that population, crossover between molecules and least similar mols to it?
+    # How does this work with the k-way tournament selection?
+
+    ## Calculating Tanimotpo Similarity using molecular fingerprints
+    ms = [Chem.MolFromSmiles(x) for x in SMILESList]
+
+    # Generate Morgan fingerprints
+    fpgen = rdFingerprintGenerator.GetMorganGenerator(radius=3)
+    fps = [fpgen.GetFingerprint(x) for x in ms]
+
+    #Calculate Tanimoto similarity
+    print(DataStructs.TanimotoSimilarity(fps[1],fps[2]))
 
 
 
