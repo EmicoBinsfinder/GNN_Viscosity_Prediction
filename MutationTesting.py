@@ -59,96 +59,46 @@ TestMolecules = ['CCCCCc1ccccc1', 'CCCC(CCCC)CCCC']
 
 TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
 
-def Mol_Crossover(StartingMolecule, CrossMol, showdiff=False, Verbose=False):
-    try:
-        """
-        Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
+# Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = GAF.Mol_Crossover(TestMoleculesMols[0],
+#                                                                                     TestMoleculesMols[1], 
+#                                                                                     showdiff=False, 
+#                                                                                     Verbose=False)
 
-        Randomly fragment each molecule 
+# print(Mut_Mol_SMILES)
 
-        Create bond between randomly selected atoms on the molecule
+# Mut_Mol1, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited1 = GAF.ReplaceAtom(Mut_Mol, Atoms, fromAromatic=False, showdiff=False)
 
-        Need to make sure that we are not bonding an aromatic to an aromatic
+# print(Mut_Mol_SMILES)
 
-        Write code to save which molecule was crossed over with
-        """
-        StartingMolecule = StartingMolecule
-        StartingMoleculeUnedited = deepcopy(StartingMolecule)
-        CrossMolecule = CrossMol
-        StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-        CrossMolecule = Chem.RWMol(CrossMolecule)
-
-        # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
-        #StartMol
-        StartMolRI = StartingMolecule.GetRingInfo()
-        StartMolAromaticBonds = StartMolRI.BondRings()
-        StartMolAromaticBondsList = []
-        for tup in StartMolAromaticBonds:
-            for bond in tup:
-                StartMolAromaticBondsList.append(int(bond))
-
-        StartMolBondIdxs = [int(x.GetIdx()) for x in StartingMolecule.GetBonds()]
-
-        StartMolBondIdxsFinal = [x for x in StartMolBondIdxs if x not in StartMolAromaticBondsList]
-        StartMolSelectedBond = StartingMolecule.GetBondWithIdx(rnd(StartMolBondIdxsFinal))
-
-        StartingMolecule.RemoveBond(StartMolSelectedBond.GetBeginAtomIdx(), StartMolSelectedBond.GetEndAtomIdx())
-        StartMolFrags = Chem.GetMolFrags(StartingMolecule, asMols=True)
-        StartingMolecule = max(StartMolFrags, default=StartingMolecule, key=lambda m: m.GetNumAtoms())
-        print(Chem.MolToSmiles(StartingMolecule))
+# if Mut_Mol != None:
+#     plotmol(Mut_Mol)
+#     plotmol(Mut_Mol1)
+#     plotmol(StartingMoleculeUnedited)
 
 
-        #CrossMol
-        CrossMolRI = CrossMolecule.GetRingInfo()
-        CrossMolAromaticBonds = CrossMolRI.BondRings()
-        CrossMolAromaticBondsList = []
-        for tup in CrossMolAromaticBonds:
-            for bond in tup:
-                CrossMolAromaticBondsList.append(int(bond))
+# os.chdir('F:/PhD/HIGH_THROUGHPUT_STUDIES/MDsimulationEvaluation/ValidationStudies12ACutoff_200mols/')
+# STARTDIR = os.getcwd()
 
-        CrossMolBondIdxs = [int(x.GetIdx()) for x in CrossMolecule.GetBonds()]
+# Names = [x for x in os.listdir(os.getcwd()) if os.path.isdir(x)]
+# Temps = [313, 373]
 
-        CrossMolBondIdxsFinal = [x for x in CrossMolBondIdxs if x not in CrossMolAromaticBondsList]
-        CrossMolSelectedBond = CrossMolecule.GetBondWithIdx(rnd(CrossMolBondIdxsFinal))
+# GKVisc100, EinsteinVisc100, EinsteinUncert100, GKUncert100 = GAF.GetVisc(Names[-1], Temps[1], STARTDIR, unit='atm', plot=False)
+# GKVisc40, EinsteinVisc40, EinsteinUncert40, GKUncert40 = GAF.GetVisc(Names[-1], Temps[0], STARTDIR, unit='atm', plot=False)
 
-        CrossMolecule.RemoveBond(CrossMolSelectedBond.GetBeginAtomIdx(), CrossMolSelectedBond.GetEndAtomIdx())
-        CrossMolFrags = Chem.GetMolFrags(CrossMolecule, asMols=True)
-        CrossMolecule = max(CrossMolFrags, default=CrossMolecule, key=lambda m: m.GetNumAtoms())
-        print(Chem.MolToSmiles(CrossMol))
+# Dens40 = float(GAF.GetDens(f'{STARTDIR}/{Names[-1]}/Run_1/eqmDensity_{Names[-1]}_T313KP1atm.out'))
+# Dens100 = float(GAF.GetDens(f'{STARTDIR}/{Names[-1]}/Run_1/eqmDensity_{Names[-1]}_T373KP1atm.out'))
 
-        InsertStyle = rnd(['Within', 'Egde'])
+# KVI = GAF.GetKVI(DVisc40=GKVisc40, DVisc100=GKVisc100, Dens40=Dens40, Dens100=Dens100, STARTINGDIR=STARTINGDIR)
+# DVI = GAF.GetDVI(DVisc40=GKVisc40, DVisc100=GKVisc100)
 
-        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = GAF.AddFragment(StartingMolecule, 
-                                                                                            CrossMolecule, 
-                                                                                            InsertStyle, 
-                                                                                            showdiff, 
-                                                                                            Verbose)
-        
+# print(KVI)
+# print(DVI)
 
-    
-    except Exception as E:
-        print(E)
-        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = None, None, None, None
+Dataset = pd.read_csv('Dataset.csv')
+SMILESList = Dataset['smiles'].to_list()[:49]
 
-    return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
+SMILES = 'COCCCOCC=CCC(=O)C=CCCOC(C=Cc1ccccc1)OCOCC=C'
 
-# for x in TestMoleculesMols:
-#     print(x)
-
-Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = Mol_Crossover(TestMoleculesMols[0],
-                                                                                    TestMoleculesMols[1], 
-                                                                                    showdiff=False, 
-                                                                                    Verbose=False)
-
-print(Mut_Mol_SMILES)
-
-Mut_Mol1, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited1 = GAF.ReplaceAtom(Mut_Mol, Atoms, fromAromatic=False, showdiff=False)
-
-print(Mut_Mol_SMILES)
-
-if Mut_Mol != None:
-    plotmol(Mut_Mol)
-    plotmol(Mut_Mol1)
-    plotmol(StartingMoleculeUnedited)
-
+Scores = GAF.TanimotoSimilarity(SMILES, SMILESList)
+print(Scores)
 

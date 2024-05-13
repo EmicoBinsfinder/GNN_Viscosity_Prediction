@@ -3,26 +3,33 @@ from rdkit.Chem import Draw
 import rdkit
 from random import sample
 from rdkit.Chem import AllChem
-from rdkit.Chem.Draw import MolDrawing, DrawingOptions
-from rdkit.Chem import rdFMCS
-from rdkit.Chem.Draw import rdDepictor
 from rdkit.Chem.rdMolDescriptors import CalcMolFormula
 from random import choice as rnd
 import random
-from rdkit.Chem.Draw import rdMolDraw2D
 from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
-from operator import itemgetter
 import subprocess
 import ast
 import pandas as pd
 import re
-import requests
 from math import log10
-import sys
 import os
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
+import numpy as np
+from scipy.constants import Boltzmann
+from scipy.optimize import curve_fit
+import sys, argparse
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+from scipy import integrate
+from tqdm import trange
+from os.path import join as join
+from os import chdir
+from os import getcwd
+from os import listdir
+import os
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
     
@@ -559,7 +566,7 @@ def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
-def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False):
+def Mol_Crossover(StartingMolecule, CrossMol, showdiff=False, Verbose=False):
     try:
         """
         Take in two molecules, the molecule to be mutated, and a list of molecules to crossover with?
@@ -572,10 +579,10 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
 
         Write code to save which molecule was crossed over with
         """
+
         StartingMoleculeUnedited = deepcopy(StartingMolecule)
-        CrossMolecule = rnd(CrossMolList)
         StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
-        CrossMolecule = Chem.RWMol(CrossMolecule)
+        CrossMolecule = Chem.RWMol(CrossMol)
 
         # Need to check and remove atom indexes where the atom is bonded to an atom that is aromatic
         #StartMol
@@ -620,7 +627,8 @@ def Mol_Crossover(StartingMolecule, CrossMolList, showdiff=False, Verbose=False)
                                                                                             showdiff, 
                                                                                             Verbose)
     
-    except:
+    except Exception as E:
+        print(E)
         Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited = None, None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
@@ -1036,7 +1044,7 @@ ethylenes = new {Name} [{NumMols}]
     
 def CalcBoxLen(MolMass, TargetDens, NumMols):
     # Very conservative implementation of Packmol volume guesser
-    BoxL = (((MolMass * NumMols * 2)/ TargetDens) * 2.5) ** (1./3.)
+    BoxL = (((MolMass * NumMols * 2)/ TargetDens) * 1.5) ** (1./3.)
     BoxLRounded = int(BoxL)
     return BoxLRounded
 
@@ -1328,21 +1336,6 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
 
     return MutMol
 
-def GetVisc(ViscosityFile):
-    try:
-        with open(f'{ViscosityFile}', 'r+') as file:
-            content = file.readlines()
-            for line in content:
-                if 'Average viscosity' in line:
-                    viscline = line.split(' ')
-                    Viscosity = viscline[2]              
-               
-    except Exception as E:
-        print(E)
-        print('Value for Viscosity not found')
-        Viscosity = 0
-    return Viscosity
-
 def fitfunc(MoleculeSMILES, Generation):
     return random.randint(1, Generation*5000)
 
@@ -1404,6 +1397,9 @@ cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction
 mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{Agent}_{SimName}.pbs')}", f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}")
+
+def CreateArrayJobMultiRun(STARTINGDIR, CWD, Generation, SimName, Agent):
+    pass
 
 def GetDVI(DVisc40, DVisc100):
     """
@@ -1580,23 +1576,206 @@ def SCScore(SMILESList):
 def Toxicity(SMILESList):
     from gt4sd.properties import PropertyPredictorRegistry
     tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
-    for SMILES in SMILESList:
-        result = tox21(SMILES)
-    pass
 
-def TanimotoSimilarity(SMILESList):
+    Results = []
+
+    for SMILES in SMILESList:
+        Partial_Result = tox21(SMILES)
+        Result = sum(Partial_Result)
+        Results.append(Result)
+
+    return Results
+
+def TanimotoSimilarity(SMILES, SMILESList):
     # Calculate Tanimoto Similarity between target molecule and every other molecule in that population, crossover between molecules and least similar mols to it?
     # How does this work with the k-way tournament selection?
 
-    ## Calculating Tanimotpo Similarity using molecular fingerprints
+    ## Calculating Tanimoto Similarity using molecular fingerprints
+
+    SMILESList = [x for x in SMILESList if x != SMILES]
     ms = [Chem.MolFromSmiles(x) for x in SMILESList]
 
+    SMILESms = Chem.MolFromSmiles(SMILES)
     # Generate Morgan fingerprints
-    fpgen = rdFingerprintGenerator.GetMorganGenerator(radius=3)
+    fpgen = rdFingerprintGenerator.GetMorganGenerator(radius=2)
+    SMILESfps = fpgen.GetFingerprint(SMILESms)
     fps = [fpgen.GetFingerprint(x) for x in ms]
 
     #Calculate Tanimoto similarity
-    print(DataStructs.TanimotoSimilarity(fps[1],fps[2]))
+    SimScores = []
 
+    for index, Molecule in enumerate(SMILESList):
+        Score = DataStructs.TanimotoSimilarity(SMILESfps, fps[index])
+        SimScores.append([Molecule, Score])
+    
+    SimScoresOrdered = sorted(SimScores, key=lambda x: x[1], reverse=True)
+    
+    return SimScoresOrdered
 
+def einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, Temp, Time):
 
+    kBT = Boltzmann * Temp
+    Pxxyy = (Pxx - Pyy) / 2
+    Pyyzz = (Pyy - Pzz) / 2
+
+    '''
+    Calculate the viscosity from the Einstein relation 
+    by integrating the components of the pressure tensor
+    '''
+    timestep = timestep * 10**(-12)
+
+    Pxy_int = integrate.cumtrapz(y=Pxy, dx=timestep, initial=0)
+    Pxz_int = integrate.cumtrapz(y=Pxz, dx=timestep, initial=0)
+    Pyz_int = integrate.cumtrapz(y=Pyz, dx=timestep, initial=0)
+
+    Pxxyy_int = integrate.cumtrapz(y=Pxxyy, dx=timestep, initial=0)
+    Pyyzz_int = integrate.cumtrapz(y=Pyyzz, dx=timestep, initial=0)
+
+    integral = (Pxy_int**2 + Pxz_int**2 + Pyz_int**2 + Pxxyy_int**2 + Pyyzz_int**2) / 5
+
+    viscosity = integral[1:] * (volume * 10**(-30) / (2 * kBT * Time[1:] * 10**(-12)) )
+
+    return viscosity
+
+def acf(data):
+    steps = data.shape[0]
+    lag = int(steps * 0.75)
+
+    # Nearest size with power of 2 (for efficiency) to zero-pad the input data
+    size = 2 ** np.ceil(np.log2(2 * steps - 1)).astype('int')
+
+    # Compute the FFT
+    FFT = np.fft.fft(data, size)
+
+    # Get the power spectrum
+    PWR = FFT.conjugate() * FFT
+
+    # Calculate the auto-correlation from inverse FFT of the power spectrum
+    COR = np.fft.ifft(PWR)[:steps].real
+
+    autocorrelation = COR / np.arange(steps, 0, -1)
+
+    return autocorrelation[:lag]
+
+def green_kubo(timestep, Pxy, Pxz, Pyz, volume, Temp):
+    # Calculate the kBT value
+    kBT = Boltzmann * Temp
+
+    # Calculate the ACFs
+    Pxy_acf = acf(Pxy)
+    Pxz_acf = acf(Pxz)
+    Pyz_acf = acf(Pyz)
+
+    avg_acf = (Pxy_acf + Pxz_acf + Pyz_acf) / 3
+
+    # Integrate the average ACF to get the viscosity
+    timestep = timestep * 10**(-12)
+    integral = integrate.cumtrapz(y=avg_acf, dx=timestep, initial=0)
+    viscosity = integral * (volume * 10**(-30) / kBT)
+
+    return avg_acf, viscosity
+
+def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
+    print(Name)
+    chdir(join(STARTDIR, Name))
+
+    Runs = [x for x in listdir(getcwd()) if os.path.isdir(x)]
+    print(Runs)
+
+    DataframeEinstein = pd.DataFrame()
+    DataframeGK = pd.DataFrame()
+
+    for Run in Runs:
+        try:
+            print(join(STARTDIR, Name, Run))
+            chdir(join(STARTDIR, Name, Run))
+            df = pd.read_csv(f'Stress_AVGOnespd_{Name}_T{Temp}KP1atm.out')
+
+            datafile = f'Stress_AVGOnespd_{Name}_T{Temp}KP1atm.out'
+            steps = len(df) - 5 # Num steps to read from the pressure tensor file
+            timestep = 1 # What timestep are you using in the pressure tensor file
+
+            # Extract viscosity from log file
+            with open(f'logGKvisc_{Name}_T{Temp}KP1atm.out', "r") as file:
+                content = file.readlines()
+                for line in content:
+                    linecontent = line.split(' ')
+                    linecontent = [x for x in linecontent if x != '']
+                    if len(linecontent) == 18:
+                        try:
+                            vol = linecontent[9]
+                            volume = float(vol)
+                        except:
+                            pass
+
+            # Conversion ratio from atm/bar to Pa
+            if unit == 'Pa':
+                conv_ratio = 1
+            elif unit == 'atm':
+                conv_ratio = 101325
+            elif unit == 'bar':
+                conv_ratio = 100000
+
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            # Initiate the pressure tensor component lists
+            Pxx, Pyy, Pzz, Pxy, Pxz, Pyz = [], [], [], [], [], []
+
+            # Read the pressure tensor elements from data file
+            with open(datafile, "r") as file:
+                next(file)
+                next(file)
+
+                for _ in trange(steps, ncols=100, desc='Progress'):
+                    line = file.readline()
+                    step = list(map(float, line.split()))
+                    Pxx.append(step[1]*conv_ratio)
+                    Pyy.append(step[2]*conv_ratio)
+                    Pzz.append(step[3]*conv_ratio)
+                    Pxy.append(step[4]*conv_ratio)
+                    Pxz.append(step[5]*conv_ratio)
+                    Pyz.append(step[6]*conv_ratio)
+
+            # Convert lists to numpy arrays
+            Pxx = np.array(Pxx)
+            Pyy = np.array(Pyy)
+            Pzz = np.array(Pzz)
+            Pxy = np.array(Pxy)
+            Pxz = np.array(Pxz)
+            Pyz = np.array(Pyz)
+
+            # Generate the time array
+            end_step = steps * timestep
+            Time = np.linspace(0, end_step, num=steps, endpoint=False)
+
+            viscosityEinstein = einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, Temp, Time)
+            avg_acf, viscosityGK = green_kubo(timestep, Pxy, Pxz, Pyz, volume, Temp)
+            
+            DataframeEinstein[f'Viscosity_{Run}'] = viscosityEinstein[:]*1000 
+            DataframeGK[f'Viscosity_{Run}'] = viscosityGK[:]*1000
+
+        except Exception as E:
+            pass
+
+    DataframeGK['Average'] = DataframeGK.mean(axis=1)
+    DataframeGK['STD'] = DataframeGK.std(axis=1)
+    DataframeEinstein['Average'] = DataframeEinstein.mean(axis=1)
+    DataframeEinstein['STD'] = DataframeEinstein.std(axis=1)
+
+    DataframeGKViscList_Average = DataframeGK['Average'].to_list()
+    DataframeGKViscList_AverageSTD = DataframeGK['STD'].to_list()
+    DataframeGKViscList_Average = [float(x) for x in DataframeGKViscList_Average]
+    DataframeGKViscList_AverageSTD = [float(x) for x in DataframeGKViscList_AverageSTD]
+    DataframeEinsteinList_Average = DataframeEinstein['Average'].to_list()
+    DataframeEinsteinList_AverageSTD = DataframeEinstein['STD'].to_list()
+    DataframeEinsteinList_Average = [float(x) for x in DataframeEinsteinList_Average]
+    DataframeEinsteinList_AverageSTD = [float(x) for x in DataframeEinsteinList_AverageSTD]
+
+    GKVisc = round((DataframeGKViscList_Average[-1]), 2)
+    EinsteinVisc = round((DataframeEinsteinList_Average[-1]), 2)
+    EinsteinUncert = DataframeEinsteinList_AverageSTD[-1]
+    GKUncert = DataframeGKViscList_AverageSTD[-1]
+
+    return GKVisc, EinsteinVisc, EinsteinUncert, GKUncert
+
+def KTournament():
+    pass
