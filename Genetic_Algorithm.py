@@ -349,7 +349,7 @@ for generation in range(2, MaxGenerations + 1):
     GenSimList = []
 
     GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'Viscosity40C',
-                                        'Viscosity100C', 'VI', 'ThermalConductivity', 'PourPoint', 'DiffusionCoefficient', 'Density40C'])
+                                        'Viscosity100C', 'VI', 'ThermalConductivity', 'Toxicity', 'SCScore', 'Density40C'])
 
     os.chdir(STARTINGDIR)
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
@@ -590,17 +590,3 @@ for generation in range(2, MaxGenerations + 1):
 print(len(GenerationMoleculeList))
 print(f'Number of failed mutations: {Fails}')
 print(len(ScoreSortedMolecules[:NumElite]))
-
-# """
-# Extras to add:
-# - A way to weight different calculated parameters
-
-# Current approach used to calculate transport properties (viscosity and thermal conductivity)
-
-# - NVT at high temperature
-# - NPT at 1 atmospheric temperature
-# - NVT again to deform box to account for change in pressure
-# - NVE to relax system
-# - NVE used in the production run (you can indeed use NVE and langevin thermostat)
-
-# """

@@ -58,6 +58,14 @@ RingDataset = pd.read_csv(join(STARTINGDIR, 'MoleculeDatabaseTestNoRings.csv'))
 TestMolecules = ['CCCCCc1ccccc1', 'CCCC(CCCC)CCCC']
 
 TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
+plotmol(TestMoleculesMols[0])
+
+from Genetic_Algorithm_Functions import GeneratePDB
+GeneratePDB(SMILES='CCCCCc1ccccc1', PATH=(join(STARTINGDIR, 'Test.pdb')))
+
+
+
+
 
 # Mut_Mol, Mut_Mol_Sanitized, Mut_Mol_SMILES, StartingMoleculeUnedited = GAF.Mol_Crossover(TestMoleculesMols[0],
 #                                                                                     TestMoleculesMols[1], 
@@ -94,11 +102,11 @@ TestMoleculesMols = [Chem.MolFromSmiles(x) for x in TestMolecules]
 # print(KVI)
 # print(DVI)
 
-Dataset = pd.read_csv('Dataset.csv')
-SMILESList = Dataset['smiles'].to_list()[:49]
+# Dataset = pd.read_csv('Dataset.csv')
+# SMILESList = Dataset['smiles'].to_list()[:49]
 
-SMILES = 'COCCCOCC=CCC(=O)C=CCCOC(C=Cc1ccccc1)OCOCC=C'
+# SMILES = 'COCCCOCC=CCC(=O)C=CCCOC(C=Cc1ccccc1)OCOCC=C'
 
-Scores = GAF.TanimotoSimilarity(SMILES, SMILESList)
-print(Scores)
+# Scores = GAF.TanimotoSimilarity(SMILES, SMILESList)
+# print(Scores)
 
