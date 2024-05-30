@@ -30,13 +30,38 @@ from os import chdir
 from os import getcwd
 from os import listdir
 import os
+import gzip
+import json
+import math
+import six
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
     
     Mut_Mol = StartingMolecule.GetMol()
     MutMolSMILES = Chem.MolToSmiles(Mut_Mol)
+    RI = Mut_Mol.GetRingInfo()
+    
+    try:
+        NumRings = RI.GetNumRings()
+    except:
+        RI = None
 
-    Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+    if RI != None:
+        NumAromaticRings = Chem.rdMolDescriptors.CalcNumAromaticRings(StartingMolecule)
+        if NumAromaticRings == 0:
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_ADJUSTHS, catchErrors=True)
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_CLEANUP, catchErrors=True)
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_FINDRADICALS, catchErrors=True)
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_PROPERTIES, catchErrors=True)
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_SETCONJUGATION, catchErrors=True)
+            Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_SETHYBRIDIZATION, catchErrors=True)
+            Mut_Mol_Sanitized = Chem.SanitizeMol(StartingMolecule, sanitizeOps=rdkit.Chem.rdmolops.SanitizeFlags.SANITIZE_SYMMRINGS, catchErrors=True)
+            print('Non-Aromatic Cyclic Hydrocarbon')
+            print(MutMolSMILES)
+        else:
+            Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
+    else:
+        Mut_Mol_Sanitized = Chem.SanitizeMol(Mut_Mol, catchErrors=True) 
 
     if len(Chem.GetMolFrags(Mut_Mol)) != 1:
         if Verbose:
@@ -131,6 +156,8 @@ def ReplaceAtom(StartingMolecule, NewAtoms, fromAromatic=False, showdiff=False, 
         if fromAromatic == False:
             # Check if atom is Aromatic
             if atom.GetIsAromatic():
+                continue
+            elif atom.IsInRing():
                 continue
             else:
                 AtomIdxs.append(atom.GetIdx())
@@ -563,6 +590,11 @@ def RemoveFragment(InputMolecule, BondTypes, showdiff=False, Verbose=False):
             Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
         else:
             Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+    
+    try: 
+        Mut_Mol
+    except:
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES
 
@@ -653,8 +685,6 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
         c. Remove selected atom and create new bond of selected bond type between left over atoms 
     """
     StartingMoleculeUnedited = deepcopy(StartingMolecule)
-    print(StartingMolecule, StartingMoleculeUnedited)
-
     #try:
     # Store indexes of atoms in molecule
     AtomIdxs = []
@@ -668,67 +698,67 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
         else:
             AtomIdxs.append(atom.GetIdx())
 
-            # Make editable mol object from starting molecule
-            StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
+    # Make editable mol object from starting molecule
+    StartingMolecule = Chem.RWMol(StartingMoleculeUnedited)
 
-            # Get number of bonds each atom in the molecule has and storing them in separate objects 
-            OneBondAtomsMolecule = []
-            TwoBondAtomsMolecule = []
-            AromaticAtomsMolecule = []
+    # Get number of bonds each atom in the molecule has and storing them in separate objects 
+    OneBondAtomsMolecule = []
+    TwoBondAtomsMolecule = []
+    AromaticAtomsMolecule = []
 
-            # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
-            for index in AtomIdxs:
-                Atom = StartingMolecule.GetAtomWithIdx(int(index))
-                if Atom.GetIsAromatic() and len(Atom.GetBonds()) == 2:
-                    AromaticAtomsMolecule.append(index)
-                elif len(Atom.GetBonds()) == 2:
-                    TwoBondAtomsMolecule.append(index)
-                elif len(Atom.GetBonds()) == 1:
-                    OneBondAtomsMolecule.append(index)
-                else:
-                    continue
-            
-            #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
-            if len(AtomIdxs) == 0:
-                print('Empty Atom Index List')
-                Mut_Mol = None
-                Mut_Mol_Sanitized = None
-                MutMolSMILES = None
-            elif fromAromatic and len(AromaticAtomsMolecule) > 0 and len(OneBondAtomsMolecule) > 0 and len(TwoBondAtomsMolecule) > 0:
-                # Add the lists of the atoms with different numbers of bonds into one object 
-                OneBondAtomsMolecule.extend(TwoBondAtomsMolecule).extend(AromaticAtomsMolecule)
-                Indexes = OneBondAtomsMolecule
-                RemoveAtomIdx = rnd(Indexes)
-                RemoveAtomNeigbors = StartingMolecule.GetAtomWithIdx(RemoveAtomIdx).GetNeighbors()
-            elif len(OneBondAtomsMolecule) > 0 and len(TwoBondAtomsMolecule) > 0:
-                #Select a random atom from the index of potential replacement atoms that aren't aromatic
-                OneBondAtomsMolecule.extend(TwoBondAtomsMolecule)
-                Indexes = OneBondAtomsMolecule
-                RemoveAtomIdx = rnd(Indexes)
-                RemoveAtomNeigbors = StartingMolecule.GetAtomWithIdx(RemoveAtomIdx).GetNeighbors()
+    # Getting atoms in starting molecule with different amount of bonds, storing indexes in list
+    for index in AtomIdxs:
+        Atom = StartingMolecule.GetAtomWithIdx(int(index))
+        if Atom.GetIsAromatic() and len(Atom.GetBonds()) == 2:
+            AromaticAtomsMolecule.append(index)
+        elif len(Atom.GetBonds()) == 2:
+            TwoBondAtomsMolecule.append(index)
+        elif len(Atom.GetBonds()) == 1:
+            OneBondAtomsMolecule.append(index)
+        else:
+            continue
+    
+    #Select atom to be deleted from list of atom indexes, check that this list is greater than 0
+    if len(AtomIdxs) == 0:
+        print('Empty Atom Index List')
+        Mut_Mol = None
+        Mut_Mol_Sanitized = None
+        MutMolSMILES = None
+    elif fromAromatic and len(AromaticAtomsMolecule) > 0 and len(OneBondAtomsMolecule) > 0 and len(TwoBondAtomsMolecule) > 0:
+        # Add the lists of the atoms with different numbers of bonds into one object 
+        OneBondAtomsMolecule.extend(TwoBondAtomsMolecule).extend(AromaticAtomsMolecule)
+        Indexes = OneBondAtomsMolecule
+        RemoveAtomIdx = rnd(Indexes)
+        RemoveAtomNeigbors = StartingMolecule.GetAtomWithIdx(RemoveAtomIdx).GetNeighbors()
+    elif len(OneBondAtomsMolecule) > 0 and len(TwoBondAtomsMolecule) > 0:
+        #Select a random atom from the index of potential replacement atoms that aren't aromatic
+        OneBondAtomsMolecule.extend(TwoBondAtomsMolecule)
+        Indexes = OneBondAtomsMolecule
+        RemoveAtomIdx = rnd(Indexes)
+        RemoveAtomNeigbors = StartingMolecule.GetAtomWithIdx(RemoveAtomIdx).GetNeighbors()
 
-                if len(RemoveAtomNeigbors) == 1:
-                    StartingMolecule.RemoveAtom(RemoveAtomIdx)
-                elif len(RemoveAtomNeigbors) == 2:
-                    StartingMolecule.RemoveAtom(RemoveAtomIdx)
-                    StartingMolecule.AddBond(RemoveAtomNeigbors[0].GetIdx(), RemoveAtomNeigbors[1].GetIdx(), rnd(BondTypes))
-                else:
-                    print('Removed atom has illegal number of neighbors')
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+        if len(RemoveAtomNeigbors) == 1:
+            StartingMolecule.RemoveAtom(RemoveAtomIdx)
+        elif len(RemoveAtomNeigbors) == 2:
+            StartingMolecule.RemoveAtom(RemoveAtomIdx)
+            StartingMolecule.AddBond(RemoveAtomNeigbors[0].GetIdx(), RemoveAtomNeigbors[1].GetIdx(), rnd(BondTypes))
+        else:
+            print('Removed atom has illegal number of neighbors')
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
-                # Check number of heavy atoms before and after, should have reduced by one 
-                if StartingMoleculeUnedited.GetNumHeavyAtoms() == StartingMolecule.GetNumHeavyAtoms():
-                    print('Atom removal failed, returning empty object')
-                    Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+        # Check number of heavy atoms before and after, should have reduced by one 
+        if StartingMoleculeUnedited.GetNumHeavyAtoms() == StartingMolecule.GetNumHeavyAtoms():
+            print('Atom removal failed, returning empty object')
+            Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
-                # Check what atom was removed from where
-                print(f'{StartingMoleculeUnedited.GetAtomWithIdx(RemoveAtomIdx).GetSymbol()} removed from position {RemoveAtomIdx}')
+        # Check what atom was removed from where
+        print(f'{StartingMoleculeUnedited.GetAtomWithIdx(RemoveAtomIdx).GetSymbol()} removed from position {RemoveAtomIdx}')
 
-                Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
-            
-            else:
-                print('Atom removal failed, returning empty object')
-                Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES  = MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff)
+    
+    else:
+        print('Atom removal failed, returning empty object')
+        Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
 
             # except:
             #     print('Atom removal could not be performed, returning empty objects')
@@ -884,15 +914,12 @@ def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondType
         result = AddFragment(StartingMolecule, rnd(Fragments), InsertStyle=InsertStyle, showdiff=showdiff)
     
     elif Mutation == 'RemoveFragment':
-        pass
-
-    elif Mutation == 'Mol_Crossover':
-        pass
+        result = RemoveFragment(StartingMolecule, BondTypes)
 
     else:
         InsertStyle = rnd(['Within', 'Egde'])
         result = InsertAromatic(StartingMolecule, AromaticMolecule, showdiff=showdiff, InsertStyle=InsertStyle)
-    
+
     return result
 
 def CheckSubstruct(MutMol):
@@ -1289,6 +1316,12 @@ write_data          GKvisc_{Name}_T${{T}}KP1atm.data
 """)
         
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
+
+    try:
+        NumRings = result[0].GetRingInfo().NumRings()
+    except:
+        NumRings = 0
+
     if result[0]!= None:
         #Get number of heavy atoms in mutated molecule
         NumHeavyAtoms = result[0].GetNumHeavyAtoms()
@@ -1311,12 +1344,14 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
         # Check for illegal substructures
         elif CheckSubstruct(result[0]):
             MutMol = None
-
+        
         # Check for number of Aromatic Rings
-        elif Chem.rdMolDescriptors.CalcNumAromaticRings(result[0]) > MaxAromRings:
-            print('Too many aromatic rings')
-            print(Chem.rdMolDescriptors.CalcNumAromaticRings(result[0]))
+        elif NumRings > MaxAromRings:
+            print('Too many rings')
+            print(NumRings)
             MutMol = None
+
+        # Check if size of rings is bad (i.e., not = 5 or 6)
         
         # Check for bridgehead atoms
         elif Chem.rdMolDescriptors.CalcNumBridgeheadAtoms(result[0]) > 0:
@@ -1467,6 +1502,9 @@ def mol_with_atom_index(mol):
         atom.SetAtomMapNum(atom.GetIdx())
     return mol
 
+def sigmoid(x):
+  return 1 / (1 + math.exp(-x))
+
 class SCScorer():
     
     #Model Parameters
@@ -1517,6 +1555,7 @@ class SCScorer():
         if not self._restored:
             raise ValueError('Must restore model weights!')
         # Each pair of vars is a weight and bias term
+        score_scale = 5.0
         for i in range(0, len(self.vars), 2):
             last_layer = (i == len(self.vars)-2)
             W = self.vars[i]
@@ -1561,17 +1600,11 @@ class SCScorer():
                 self.vars = json.loads(json_str)
                 self.vars = [np.array(x) for x in self.vars]
 
-def SCScore(SMILESList):
+def SCScore(MolSMILES, WeightPath=None):
     model = SCScorer()
     model.restore(os.path.join('C:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.json.gz'))
-    smis = SMILESList
-    SCScoreList = []
-    for smi in smis:
-        (smi, sco) = model.get_score_from_smi(smi)
-        SCScoreList.append(sco)
-        print('%.4f <--- %s' % (sco, smi))
-    
-    return SCScoreList
+    (smi, sco) = model.get_score_from_smi(MolSMILES)
+    return sco
 
 def Toxicity(SMILESList):
     from gt4sd.properties import PropertyPredictorRegistry
