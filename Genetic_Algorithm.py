@@ -95,7 +95,19 @@ StartingMolecule = 'C(c1ccccc1)(c1ccccc1)CCCCCCCCCCCCC'
 
 #Implementing Niching and Weighted 
 
+MoleculeDB = pd.read_csv('Generation1Database.csv')
 
+MoleculeList = MoleculeDB['SMILES'].tolist()
+
+for Molecule in MoleculeList[:2]:
+     SumTanimoto = 0
+     Scores = GAF.TanimotoSimilarity(Molecule, MoleculeList)
+     AvScore = 1 - (sum(Scores) / 50) # The higher the score, the less similar the molecule is to others
+     print(Molecule, AvScore)
+
+
+# TotalSimilarityScore = 0
+# TanimotoComparisonList = MolList.remove(Molecule)
 
 
 
@@ -110,7 +122,7 @@ StartingMolecule = 'C(c1ccccc1)(c1ccccc1)CCCCCCCCCCCCC'
 
 # print(RI.NumRings()) #Get number of rings in a molecule
 # print(NumAromaticRings)
-# sys.exit()
+sys.exit()
 
 Mols = [Chem.MolFromSmiles(x) for x in Mols]
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
@@ -351,9 +363,9 @@ for Molecule in FirstGenSimList:
         # MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
         # MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
         # MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-        MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
-        MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
-        MoleculeDatabase.at[IDNumber, 'Toxicity'] = Toxicity
+        # MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
+        # MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
+        # MoleculeDatabase.at[IDNumber, 'Toxicity'] = Toxicity
         MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScore
     except:
         pass

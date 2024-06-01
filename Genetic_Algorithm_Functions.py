@@ -1639,11 +1639,9 @@ def TanimotoSimilarity(SMILES, SMILESList):
 
     for index, Molecule in enumerate(SMILESList):
         Score = DataStructs.TanimotoSimilarity(SMILESfps, fps[index])
-        SimScores.append([Molecule, Score])
+        SimScores.append(Score)
     
-    SimScoresOrdered = sorted(SimScores, key=lambda x: x[1], reverse=True)
-    
-    return SimScoresOrdered
+    return SimScores
 
 def einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, Temp, Time):
 
