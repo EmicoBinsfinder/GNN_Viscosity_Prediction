@@ -93,17 +93,58 @@ fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC'
 StartingMolecule = 'C(c1ccccc1)(c1ccccc1)CCCCCCCCCCCCC'
 
 
-#Implementing Niching and Weighted 
+#Implementing Niching and Weighted Scoring
 
 MoleculeDB = pd.read_csv('Generation1Database.csv')
 
 MoleculeList = MoleculeDB['SMILES'].tolist()
 
+#Similarity Scores
 for Molecule in MoleculeList[:2]:
      SumTanimoto = 0
      Scores = GAF.TanimotoSimilarity(Molecule, MoleculeList)
      AvScore = 1 - (sum(Scores) / 50) # The higher the score, the less similar the molecule is to others
      print(Molecule, AvScore)
+
+
+import random
+
+# Generate a random float between 0 and 1
+random_float = random.random()
+
+print(random_float)
+
+#SCScore
+for Molecule in MoleculeList[:2]:
+    SCScore = GAF.SCScore(Molecule)
+    SCScoreNorm = SCScore/5
+    print(Molecule, SCScoreNorm)
+
+# Toxicity
+for Molecule in MoleculeList[:2]:
+    ToxNorm = random_float = random.random()
+    
+#     tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
+#     Partial_Result = tox21(Molecule)
+#     Result = sum(Partial_Result)
+#     ToxNorm = Result/5
+
+# Viscosity
+
+
+
+# Viscosity Index
+for Molecule in MoleculeList[:2]:
+    DVisc40 = random.uniform(2, 30)
+    DVisc100 = random.uniform(2, 100) / random.uniform(1.5, 20)
+    print(DVisc40, DVisc100)
+    DVI = GAF.GetDVI(DVisc40, DVisc100)
+    print(DVI)
+
+# Thermal Conductivity
+
+
+
 
 
 # TotalSimilarityScore = 0
