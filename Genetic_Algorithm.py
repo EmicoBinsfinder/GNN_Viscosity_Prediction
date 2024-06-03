@@ -130,7 +130,9 @@ for Molecule in MoleculeList[:2]:
 #     ToxNorm = Result/5
 
 # Viscosity
-
+    # for Molecule in MoleculeList[:2]:
+    # DVisc40 = GAF.GetVisc(STARTDIR, Molecule, 313)
+    # DVisc100 = GAF.GetVisc(STARTDIR, Molecule, 373)
 
 
 # Viscosity Index

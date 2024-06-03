@@ -1688,10 +1688,7 @@ def acf(data):
 
     return autocorrelation[:lag]
 
-def green_kubo(timestep, Pxy, Pxz, Pyz, volume, Temp):
-    # Calculate the kBT value
-    kBT = Boltzmann * Temp
-
+def green_kubo(timestep, Pxy, Pxz, Pyz, volume, kBT):
     # Calculate the ACFs
     Pxy_acf = acf(Pxy)
     Pxz_acf = acf(Pxz)
@@ -1703,31 +1700,46 @@ def green_kubo(timestep, Pxy, Pxz, Pyz, volume, Temp):
     timestep = timestep * 10**(-12)
     integral = integrate.cumtrapz(y=avg_acf, dx=timestep, initial=0)
     viscosity = integral * (volume * 10**(-30) / kBT)
+    # print(viscosity)
 
     return avg_acf, viscosity
 
-def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
-    print(Name)
-    chdir(join(STARTDIR, Name))
+# Viscosity from Einstein relation
+def einstein(timestep, Pxy, Pxz, Pyz, volume, kBT, Time):
+    '''
+    Calculate the viscosity from the Einstein relation 
+    by integrating the components of the pressure tensor
+    '''
+    timestep = timestep * 10**(-12)
 
+    Pxy_int = integrate.cumtrapz(y=Pxy, dx=timestep, initial=0)
+    Pxz_int = integrate.cumtrapz(y=Pxz, dx=timestep, initial=0)
+    Pyz_int = integrate.cumtrapz(y=Pyz, dx=timestep, initial=0)
+
+    integral = (Pxy_int**2 + Pxz_int**2 + Pyz_int**2) / 3
+    viscosity = integral[1:] * (volume * 10**(-30) / (2 * kBT * Time[1:] * 10**(-12)) )
+
+    return viscosity
+
+def GetVisc(STARTDIR, Molecule, Temp):
+    chdir(join(STARTDIR, Molecule))
     Runs = [x for x in listdir(getcwd()) if os.path.isdir(x)]
-    print(Runs)
 
     DataframeEinstein = pd.DataFrame()
     DataframeGK = pd.DataFrame()
 
     for Run in Runs:
         try:
-            print(join(STARTDIR, Name, Run))
-            chdir(join(STARTDIR, Name, Run))
-            df = pd.read_csv(f'Stress_AVGOnespd_{Name}_T{Temp}KP1atm.out')
+            chdir(join(STARTDIR, Molecule, Run))
+            df = pd.read_csv(f'Stress_AVGOnespd_{Molecule}_T{Temp}KP1atm.out')
 
-            datafile = f'Stress_AVGOnespd_{Name}_T{Temp}KP1atm.out'
-            steps = len(df) - 5 # Num steps to read from the pressure tensor file
+            unit = 'atm' #Pressure, bar or temperature
+            datafile = f'Stress_AVGOnespd_{Molecule}_T{Temp}KP1atm.out'
+            steps = len(df) -1 # Num steps to read from the pressure tensor file
             timestep = 1 # What timestep are you using in the pressure tensor file
+            temperature = Temp #System temp
 
-            # Extract viscosity from log file
-            with open(f'logGKvisc_{Name}_T{Temp}KP1atm.out', "r") as file:
+            with open(f'logGKvisc_{Molecule}_T{Temp}KP1atm.out', "r") as file:
                 content = file.readlines()
                 for line in content:
                     linecontent = line.split(' ')
@@ -1739,6 +1751,9 @@ def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
                         except:
                             pass
 
+            # print(volume)
+            each = 10 # Sample frequency
+
             # Conversion ratio from atm/bar to Pa
             if unit == 'Pa':
                 conv_ratio = 1
@@ -1746,6 +1761,9 @@ def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
                 conv_ratio = 101325
             elif unit == 'bar':
                 conv_ratio = 100000
+
+            # Calculate the kBT value
+            kBT = Boltzmann * temperature
 
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Initiate the pressure tensor component lists
@@ -1756,7 +1774,7 @@ def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
                 next(file)
                 next(file)
 
-                for _ in trange(steps, ncols=100, desc='Progress'):
+                for _ in range(steps):
                     line = file.readline()
                     step = list(map(float, line.split()))
                     Pxx.append(step[1]*conv_ratio)
@@ -1778,35 +1796,60 @@ def GetVisc(Name, Temp, STARTDIR, unit='atm', plot=False):
             end_step = steps * timestep
             Time = np.linspace(0, end_step, num=steps, endpoint=False)
 
-            viscosityEinstein = einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, Temp, Time)
-            avg_acf, viscosityGK = green_kubo(timestep, Pxy, Pxz, Pyz, volume, Temp)
-            
-            DataframeEinstein[f'Viscosity_{Run}'] = viscosityEinstein[:]*1000 
-            DataframeGK[f'Viscosity_{Run}'] = viscosityGK[:]*1000
+            viscosity = einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, kBT, Time)
+
+            # Save the running integral of viscosity as a csv file
+            df = pd.DataFrame({"time(ps)" : Time[:viscosity.shape[0]:each], "viscosity(Pa.s)" : viscosity[::each]})
+
+            DataframeEinstein[f'Viscosity_{Run}'] = viscosity[:]*1000
+
+            Time = np.linspace(0, end_step, num=steps, endpoint=False)
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            # Viscosity from Green-Kubo relation
+            avg_acf, viscosity = green_kubo(timestep)
+
+            DataframeGK[f'Viscosity_{Run}'] = viscosity[:]*1000
+
+            # Save running integral of the viscosity as a csv file
+            # df = pd.DataFrame({"time(ps)" : Time[:viscosity.shape[0]:each], "viscosity(Pa.s)" : viscosity[::each]})
 
         except Exception as E:
+            print(E)
+            ViscosityAv = None
+            ViscosityAvEinstein = None
             pass
 
-    DataframeGK['Average'] = DataframeGK.mean(axis=1)
-    DataframeGK['STD'] = DataframeGK.std(axis=1)
-    DataframeEinstein['Average'] = DataframeEinstein.mean(axis=1)
-    DataframeEinstein['STD'] = DataframeEinstein.std(axis=1)
+    try:
+        # Plot average value for each timestep
 
-    DataframeGKViscList_Average = DataframeGK['Average'].to_list()
-    DataframeGKViscList_AverageSTD = DataframeGK['STD'].to_list()
-    DataframeGKViscList_Average = [float(x) for x in DataframeGKViscList_Average]
-    DataframeGKViscList_AverageSTD = [float(x) for x in DataframeGKViscList_AverageSTD]
-    DataframeEinsteinList_Average = DataframeEinstein['Average'].to_list()
-    DataframeEinsteinList_AverageSTD = DataframeEinstein['STD'].to_list()
-    DataframeEinsteinList_Average = [float(x) for x in DataframeEinsteinList_Average]
-    DataframeEinsteinList_AverageSTD = [float(x) for x in DataframeEinsteinList_AverageSTD]
+        DataframeEinstein = DataframeEinstein.dropna()
+        DataframeGK = DataframeGK.dropna()
+        DataframeGK['Average'] = DataframeGK.mean(axis=1)
+        DataframeGK['STD'] = DataframeGK.std(axis=1)
+        DataframeEinstein['Average'] = DataframeEinstein.mean(axis=1)
+        DataframeEinstein['STD'] = DataframeEinstein.std(axis=1)
 
-    GKVisc = round((DataframeGKViscList_Average[-1]), 2)
-    EinsteinVisc = round((DataframeEinsteinList_Average[-1]), 2)
-    EinsteinUncert = DataframeEinsteinList_AverageSTD[-1]
-    GKUncert = DataframeGKViscList_AverageSTD[-1]
+        DataframeGKViscList_Average = DataframeGK['Average'].to_list()
+        DataframeGKViscList_AverageSTD = DataframeGK['STD'].to_list()
+        DataframeGKViscList_Average = [float(x) for x in DataframeGKViscList_Average]
+        DataframeGKViscList_AverageSTD = [float(x) for x in DataframeGKViscList_AverageSTD]
+        DataframeEinsteinList_Average = DataframeEinstein['Average'].to_list()
+        DataframeEinsteinList_AverageSTD = DataframeEinstein['STD'].to_list()
+        DataframeEinsteinList_Average = [float(x) for x in DataframeEinsteinList_Average]
+        DataframeEinsteinList_AverageSTD = [float(x) for x in DataframeEinsteinList_AverageSTD]
 
-    return GKVisc, EinsteinVisc, EinsteinUncert, GKUncert
+        step = list(range(0, len(DataframeGKViscList_Average)))
+        step = [x/1000 for x in step]
+
+        ViscosityAv = round((DataframeGKViscList_Average[-1]), 2)
+        ViscosityAvEinstein = round((DataframeEinsteinList_Average[-1]), 2)
+
+    except Exception as E:
+        print(E)
+        ViscosityAv = None
+        ViscosityAvEinstein = None
+
+    return ViscosityAv, ViscosityAvEinstein
 
 def KTournament():
     pass
