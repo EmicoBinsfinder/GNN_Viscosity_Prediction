@@ -14,6 +14,7 @@ import pandas as pd
 import re
 from math import log10
 import os
+# from gt4sd.properties import PropertyPredictorRegistry
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
@@ -1076,23 +1077,19 @@ def CalcBoxLen(MolMass, TargetDens, NumMols):
     return BoxLRounded
 
 def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime):
+
+    VelNumber = rnd.randint(0, 1000000)
+
     if os.path.exists(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}"):
         print('Specified Moltemplate file already exists in this location, overwriting.')
         os.remove(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}")
 
-    if os.path.exists(f"{os.path.join(CWD, f'{Name}_system_373K.lammps')}"):
-        print('Specified Moltemplate file already exists in this location, overwriting.')
-        os.remove(f"{os.path.join(CWD, f'{Name}_system_373K.lammps')}")
-
-    # Write LAMMPS file for 40C run
+    # Write LAMMPS file for
     with open(os.path.join(CWD, f'{Name}_system_{Temp}K.lammps'), 'x') as file:
         file.write(f"""
-
 # Setup parameters
 variable       		T equal {Temp} # Equilibrium temperature [K]
 log             	logEQM_{Name}_T${{T}}KP1atm.out
-
-#include         "{Name}_system.in.init" Need to determine correct Kspace params
 
 # Potential information
 units           	real
@@ -1100,13 +1097,16 @@ dimension       	3
 boundary        	p p p
 atom_style      	full
 
-pair_style      	lj/cut/coul/cut 12.0 12.0 
-bond_style      	harmonic
-angle_style     	harmonic
-dihedral_style 		opls
-improper_style     	harmonic
-pair_modify 		mix geometric tail yes
-special_bonds   	lj/coul 0.0 0.0 0.5
+units real
+atom_style full
+bond_style harmonic
+angle_style harmonic
+dihedral_style hybrid opls multi/harmonic
+improper_style harmonic
+pair_style lj/cut/coul/long 12.0 #change to cut/coul/long for kspace calculations
+pair_modify mix geometric tail yes
+special_bonds lj/coul 0.0 0.0 0.5
+kspace_style pppm 0.0001
 
 # Read lammps data file consist of molecular topology and forcefield info
 read_data       	{Name}_system.data
@@ -1114,64 +1114,89 @@ neighbor        	2.0 bin
 neigh_modify 		every 1 delay 0 check yes
 
 include         "{Name}_system.in.charges"
-include         "{Name}_system.in.settings"
+include         "settings.txt"
+
+########################################################################################
+#CHARGES
+
+set type 80 charge -0.22    #CARBON CH3 (Sui)
+set type 81 charge -0.148   #CARBON CH2 (Sui)
+set type 88 charge -0.160   #CARBON CH (Sui)
+set type 85 charge  0.074   #HYDROGEN HC_CH2&CH3 single bond (Sui)
+set type 89 charge  0.160   #HYDROGEN HC_CH (hydrogen with double bonded carbon) (Sui)
+set type 406 charge 0.75    #Ester -COOR >>>>> CARBON >>> C_2 (Pluhackova)
+set type 407 charge -0.55   #Ester C=O >>>>> OXYGEN >>> O_2 (Pluhackova)
+set type 408 charge -0.45   #Ester CO-O-R >>>>> OXYGEN >>> OS (Pluhackova)
+
+########################################################################################
+#NON BONDED INTERACTIONS
+
+pair_coeff   80  80    0.066000000000000   3.500000     
+pair_coeff   81  81    0.066000000000000   3.500000
+pair_coeff   82  82    0.075710400000000   3.550000    
+pair_coeff   85  85    0.026290631000000   2.500000    
+pair_coeff   89  89    0.030000000000000   2.420000   
+pair_coeff   406 406   0.105000000000000   3.187500
+pair_coeff   407 407   0.167360000000000   3.108000
+pair_coeff   408 408   0.169360000000000   2.550000
+
+#########################################################################################
+#DIHEDRALS
+
+dihedral_coeff 40  multi/harmonic   0.728438     -0.864800   -1.23214     1.336379    0.000000    #CT CT C2 O2
+dihedral_coeff 51  multi/harmonic   -0.448883    -1.178005   0.624517     0.982929    0.000000    #CT CT C2 OS
+dihedral_coeff 52  multi/harmonic   0.217797     0.636519    -0.023530    -0.856219   0.000000    #HC CT CT OS
+dihedral_coeff 68  multi/harmonic   5.435142     0.00000     -5.715862    0.00000     0.00000     #CT OS C2 O2 
+dihedral_coeff 70  multi/harmonic   7.761123     -1.553674   -5.715855    0.00000     0.00000     #CT C2 OS CT
+dihedral_coeff 183 multi/harmonic   -1.432205    2.078667	 0.624936     -1.239164   0.000000    #C2 CT CT CT 
+dihedral_coeff 187 multi/harmonic   -0.174038    -0.440071   -0.017288    0.588167    0.000000    #C2 CT CT HC
+dihedral_coeff 196 multi/harmonic   0.124000     -0.055020   0.214340     -0.356440   0.000000    #CT CT CT CT (Sui)
+dihedral_coeff 265 multi/harmonic   -1.68071     1.796674    1.243688     -1.243040   0.000000    #C2 OS CT CT 
+dihedral_coeff 799 multi/harmonic   0.636100     0.379845    1.020183     -2.006533   0.000000    #CT CT CT OS
+
+##########################################################################################
+#Dictionary 
+#HC = Aliphatic hydrogen 
+#OH = hydroxyl oxygen 
+#OS = alkoxy oxygen
+#O_2 = ester carbonyl oxygen 
+#C_2 = ester carbonyl carbon
+#HC = alpha methoxy carbon
+#CT = alkoxy carbon 
 
 # Define variables
 variable        	eqmT equal $T			 			# Equilibrium temperature [K]
 variable        	eqmP equal 1.0						# Equilibrium pressure [atm]
-variable    		p equal 100						    # Nrepeat, correlation length
+variable    		p equal 100						    # Nrepeat, correlation length (Check different sample lengths)
 variable    		s equal 10       					# Nevery, sample interval
 variable    		d equal $s*$p  						# Nfreq, dump interval
 variable 			rho equal density
 
-# Minimize system at target temperature using the default conjugate gradient method
-velocity        	all create ${{eqmT}} 482648
+# Minimisation
+velocity        	all create ${{eqmT}} {VelNumber}
 fix             	min all nve
 thermo          	10
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
-# dump            	1 all custom 10 min_w_{Name}_T${{T}}KP1atm.lammpstrj id mol type x y z mass q
-# dump            	2 all custom 10 min_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
-# dump_modify     	1 sort id
-# dump_modify     	2 sort id
 minimize        	1.0e-16 1.06e-6 100000 500000
-# undump          	1
-# undump          	2
 write_restart   	Min_{Name}_T${{T}}KP1atm.restart
 
 unfix           	min
 reset_timestep  	0
 neigh_modify 		every 1 delay 0 check yes
 
-# NVT at high temperature
-fix             	nvt1000K all nvt temp 1000.0 1000.0 100.0
-thermo			    $d
-thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
-fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
-					append thermoNVT1000K_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-# dump            	1 all custom $d NVT1000K_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
-# dump_modify     	1 sort id
-run            		250000
-# undump          	1
-unfix			    nvt1000K
-unfix               thermo_print
-write_restart   	NVT_{Name}_T1000KP1atm.restart
-
-# NPT: Isothermal-isobaric ensemble to set the desired pressure; compute average density at that pressure
+# NPT 
 fix 				NPT all npt temp ${{eqmT}} ${{eqmT}} 100.0 iso ${{eqmP}} ${{eqmP}} 25.0
 fix             	dave all ave/time $s $p $d v_rho ave running file eqmDensity_{Name}_T${{T}}KP1atm.out
 thermo				$d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
 					append thermoNPT_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-# dump            	1 all custom $d NPT_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
-# dump_modify     	1 sort id
 run					1000000
-# undump          	1
 unfix				NPT
 unfix               thermo_print
 write_restart  		NPT_{Name}_T${{T}}KP1atm.restart
 
-# NVT: Canonical ensemble to deform the box to match increase in P in previous step
+# NVT
 variable        	averho equal f_dave
 variable        	adjustrho equal (${{rho}}/${{averho}})^(1.0/3.0) # Adjustment factor needed to bring rho to averge rho
 unfix				dave
@@ -1181,39 +1206,27 @@ thermo         		$d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
 					append thermoNVT_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-# dump            	1 all custom $d NVT_u_{Name}_T${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
-# dump_modify     	1 sort id
 run					500000
-# undump          	1
 unfix				NVT
 unfix           	adjust
 unfix               thermo_print
 write_restart  		NVT_{Name}_T${{T}}KP1atm.restart
 
-# NVE: Microcanonical ensemble to explore the configuration space at constant T and V; relax
-fix	       			NVE all nve
-fix 				thermostat all langevin ${{eqmT}} ${{eqmT}} 100.0 39847 
-thermo          	$d
-thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
-
-fix 			thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
-			append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-
-run             	250000
-
-unfix           	NVE
-
-unfix 			thermostat
-
-unfix               	thermo_print
-
-# Output the state generated that is needed to shear the molecules
-
-write_restart  		state_{Name}_T${{T}}KP1atm.restart
 write_data 		equilibrated.data
 
-# Green-Kubo method via fix ave/correlate
+# NVE Equilration 
 
+fix	       			NVE all nve
+thermo          	$d
+thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
+fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
+					append thermoNVE_${Name}_T${{T}}FP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
+run             	250000
+unfix           	NVE
+unfix 				thermostat
+unfix               thermo_print
+
+# Green-Kubo method via fix ave/correlate
 log                 logGKvisc_{Name}_T${{T}}KP1atm.out
 
 # Define variables
@@ -1229,8 +1242,8 @@ variable            kCal2J equal 4186.0/6.02214e23
 variable    		atm2Pa equal 101325.0		
 variable    		A2m equal 1.0e-10 			
 variable    		fs2s equal 1.0e-15 			
-variable			Pas2cP equal 1.0e+3			
-variable    		convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}
+variable			PaS2mPaS equal 1.0e+3			
+variable    		convert equal ${{atm2Pa}}*${{atm2Pa}}*${{fs2s}}*${{A2m}}*${{A2m}}*${{A2m}}*${{PaS2mPaS}}
 variable            convertWk equal ${{kCal2J}}*${{kCal2J}}/${{fs2s}}/${{A2m}}
 
 ##################################### Viscosity Calculation #####################################################
@@ -1252,7 +1265,6 @@ variable        Jy equal c_flux[2]/vol
 variable        Jz equal c_flux[3]/vol
 
 fix             	1 all nve
-fix             	2 all langevin ${{eqmT}} ${{eqmT}} 100.0 482648
 
 variable        	myPxx equal c_myP[1]
 variable        	myPyy equal c_myP[2]
@@ -1261,8 +1273,9 @@ variable     		myPxy equal c_myP[4]
 variable     		myPxz equal c_myP[5]
 variable     		myPyz equal c_myP[6]
 
-fix             	3 all ave/time 1 1 1 v_myPxx v_myPyy v_myPzz v_myPxy v_myPxz v_myPyz ave one #file Stress_AVGOne111_{Name}_T${{T}}KP1atm.out
+fix             	3 all ave/time 1 1 1 v_myPxx v_myPyy v_myPzz v_myPxy v_myPxz v_myPyz ave one file Stress_AVGOne111_{Name}_T${{T}}KP1atm.out
 fix             	4 all ave/time $s $p $d v_myPxx v_myPyy v_myPzz v_myPxy v_myPxz v_myPyz ave one file Stress_AVGOnespd_{Name}_T${{T}}KP1atm.out
+fix             	FluxVector all ave/time $s $p $d v_Jx v_Jy v_Jz ave one file HeatFlux_AVGOnespd_{Name}_T${{T}}KP1atm.out
 
 fix          SS all ave/correlate $s $p $d &
              v_myPxy v_myPxz v_myPyz type auto file S0St.dat ave running
@@ -1293,8 +1306,6 @@ thermo_style custom step temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vo
 fix thermo_print all print $d "$(temp) $(press) $(v_myPxy) $(v_myPxz) $(v_myPyz) $(v_v11) $(v_v22) $(v_v33) $(vol) $(v_Jx) $(v_Jy) $(v_Jz) $(v_k11) $(v_k22) $(v_k33) $(v_vacf)" &
     append thermoNVE_{Name}_T${{T}}KP1atm.out screen no title "# temp press v_myPxy v_myPxz v_myPyz v_v11 v_v22 v_v33 vol v_Jx v_Jy v_Jz v_k11 v_k22 v_k33 v_vacf"
 
-# Dump all molecule coordinates
-
 # save thermal conductivity to file
 variable     kav equal (v_k11+v_k22+v_k33)/3.0
 fix          fxave1 all ave/time $d 1 $d v_kav file lamda.txt
@@ -1306,13 +1317,13 @@ fix          fxave2 all ave/time $d 1 $d v_visc file visc.txt
 # save diffusion coefficient to a file
 fix          fxave3 all ave/time $d 1 $d v_vacf file diff_coeff.txt
 
+dump        LAMMPS all custom $d NVE_Prod_{Name}_${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
+
 run          {GKRuntime}
 
 variable     ndens equal count(all)/vol
 print        "Average viscosity: ${{visc}} [Pa.s] @ $T K, ${{ndens}} atoms/A^3"
 
-write_restart   	GKvisc_{Name}_T${{T}}KP1atm.restart
-write_data          GKvisc_{Name}_T${{T}}KP1atm.data
 """)
         
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
@@ -1404,14 +1415,14 @@ def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, 
 
     return MoleculeDatabase
 
-def CreateArrayJob(STARTINGDIR, CWD, Generation, SimName, Agent):
+def CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation, SimName, Agent, GenerationSize, NumElite):
     #Create an array job for each separate simulation
     if Generation == 1:
         BotValue = 0
         TopValue = 49
     else:
-        GenerationRange = Generation*35 - 20
-        ListRange = list(range(GenerationRange, GenerationRange + 35))
+        GenerationRange = Generation*(GenerationSize-NumElite) 
+        ListRange = list(range(GenerationRange, GenerationRange + (GenerationSize-NumElite)))
         TopValue = ListRange[-1]
         BotValue = ListRange[0]
 
@@ -1447,7 +1458,7 @@ def GetDVI(DVisc40, DVisc100):
         DVI = 220 - (7*(10**S))
         return DVI
     except:
-        return None
+        return 0
 
 def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     # Get Kinematic Viscosities
@@ -1457,7 +1468,7 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     RefVals = pd.read_excel(os.path.join(STARTINGDIR, 'VILookupTable.xlsx'), index_col=None)
 
     if KVisc100 == None:
-        VI = None
+        VI = 0
 
     elif KVisc100 >= 2:
         # Retrive L and H value
@@ -1487,7 +1498,7 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
             VI = None
     else:
         print('VI Undefined for input Kinematic Viscosities')
-        VI = None
+        VI = 0
     
     return VI
 
@@ -1606,18 +1617,12 @@ def SCScore(MolSMILES, WeightPath=None):
     (smi, sco) = model.get_score_from_smi(MolSMILES)
     return sco
 
-def Toxicity(SMILESList):
-    from gt4sd.properties import PropertyPredictorRegistry
-    tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
-
-    Results = []
-
-    for SMILES in SMILESList:
-        Partial_Result = tox21(SMILES)
-        Result = sum(Partial_Result)
-        Results.append(Result)
-
-    return Results
+# def Toxicity(MOLSMILES):
+#     tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
+#     Partial_Result = tox21(MOLSMILES)
+#     Result = sum(Partial_Result)
+#     ToxNorm = Result/5
+#     return ToxNorm
 
 def TanimotoSimilarity(SMILES, SMILESList):
     # Calculate Tanimoto Similarity between target molecule and every other molecule in that population, crossover between molecules and least similar mols to it?
@@ -1851,5 +1856,26 @@ def GetVisc(STARTDIR, Molecule, Temp):
 
     return ViscosityAv, ViscosityAvEinstein
 
-def KTournament():
-    pass
+def KTournament(Elites, K=3):
+    ElitePop = [[x[-2], x[-1]] for x in Elites]
+    competitors = random.sample(ElitePop, K)
+    Winner = sorted(competitors, key=lambda x: float(x[1]), reverse=True)[0]
+    return Winner
+
+def min_max_normalize(scores):
+    if not scores:
+        return []
+
+    # Extract the scores from the list of tuples
+    raw_scores = [score for _, score in scores]
+
+    # Compute the min and max of the scores
+    min_score = min(raw_scores)
+    max_score = max(raw_scores)
+
+    # Apply min-max normalization
+    normalized_scores = [
+        (id, (score - min_score) / (max_score - min_score)) for id, score in scores
+    ]
+
+    return normalized_scores

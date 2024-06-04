@@ -85,30 +85,13 @@ DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
 Mols = ['CCCCCCCCCCCCCCCC(CC1CCCCC1)CC2CCCCC2', 'CCCCCCCCCCCCC(CCCCCCCCCCCC)C1CCCCC1',
-    'CCCCCCCCCCCCCCCC', 'C(c1ccccc1)(c1ccccc1)CCCCCCCCCCCCC', 'CCCCC(CC)COC(=O)CCCCCCCCC(=O)OCC(CC)CCCC', 
+    'CCCCCCCCCCCCCCCC', 'CCCCC(CC)COC(=O)CCCCCCCCC(=O)OCC(CC)CCCC', 
              'CCCCCCCCCCCCC(c1ccccc1)CCCCCCCCCCCC', 'CC(C)CCCC(C)CCCC(C)CCCCC(C)CCCC(C)CCCC(C)C', 'CC1=CC=CC2=CC=CC=C12',
-             'CCCCCCCCCCC(CCCCCCCCCC)CCCCCCCCCC', 'C(c1ccccc1)(c1ccccc1)CCCCCCCCCCCCC']
+             'CCCCCCCCCCC(CCCCCCCCCC)CCCCCCCCCC', 'C(c1ccccc1)CCCCCC(c1ccccc1)CCCCCCC']
 
-fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C', 'c1ccccc1', 'C1CCCCC1', 'C1CCCC1']
+fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C', 'C1CCCCC1', 'C1CCCC1', 'c1ccccc1']
 
-
-MoleculeDB = pd.read_csv('MoleculeDatabase.csv')
-
-#Generate Score
-ViscScores = MoleculeDB['DViscosity40C'].tolist()
-SCScores = MoleculeDB['SCScore'].tolist()
-DVIScores = MoleculeDB['DVI'].tolist()
-ToxicityScores = MoleculeDB['Toxicity'].tolist()
-SimilarityScores = MoleculeDB['SimilarityScore'].tolist()
-ThermalKScores = MoleculeDB['ThermalConductivity'].tolist()
-MoleculeNames = MoleculeDB['ID'].tolist()
-
-print(MoleculeNames)
-print(ViscScores)
-
-
-
-sys.exit()
+MoleculeDatabase = pd.read_csv('MoleculeDatabase.csv')
 
 Mols = [Chem.MolFromSmiles(x) for x in Mols]
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
@@ -135,16 +118,18 @@ Silent = True # Edit outputs to only print if this flag is False
 NumElite = 25
 IDcounter = 0
 FirstGenerationAttempts = 0
-GenerationMolecules = []
+MasterMoleculeList = [] #Keeping track of all generated molecules
 FirstGenSimList = []
 MaxNumHeavyAtoms = 50
 MinNumHeavyAtoms = 5
+MutationRate = 0.4
 showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
 LOPLS = False # Whether or not to use OPLS or LOPLS, False uses OPLS
-MaxGenerations = 2
+MaxGenerations = 3
 MaxMutationAttempts = 200
 Fails = 0
+NumRuns = 10
 NumAtoms = 12000
 Agent = 'Agent1'
 
@@ -156,11 +141,9 @@ os.chdir(join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
 os.chdir(STARTINGDIR)
 
-
 # Master Dataframe where molecules from all generations will be stored
 MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
-                                        'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'ThermalConductivity', 'Toxicity', 'SCScore',
-                                          'Density40C', 'SimilarityScore'])
+                                        'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'ThermalConductivity', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
 
 # Generation Dataframe to store molecules from each generation
 GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
@@ -182,7 +165,7 @@ while len(MoleculeDatabase) < GenerationSize:
     result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, Fragments=fragments)
 
     # Implement checks based on predetermined criteria (MolLength, Illegal Substructs etc.)
-    if GAF.GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings=2) == None:
+    if GAF.GenMolChecks(result, MasterMoleculeList, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings=2) == None:
         MutMol = None
     else:
         HeavyAtoms = result[0].GetNumHeavyAtoms() # Get number of heavy atoms in molecule
@@ -261,6 +244,7 @@ while len(MoleculeDatabase) < GenerationSize:
            
             # Generate list of molecules to simulate in this generation
             FirstGenSimList.append([Name, MutMolSMILES])
+            MasterMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
             print(f'Final Molecule SMILES: {MutMolSMILES}') 
             IDcounter +=1
         
@@ -272,10 +256,10 @@ while len(MoleculeDatabase) < GenerationSize:
 Generation = 1
 CWD = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # Create and run array job for 40C viscosity
-GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='313K.lammps', Agent=Agent)
+GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=1, SimName='313K.lammps', Agent=Agent)
 
 # Create and run array job for 100C viscosity
-GAF.CreateArrayJob(STARTINGDIR, CWD, Generation=1, SimName='373K.lammps', Agent=Agent)
+GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=1, SimName='373K.lammps', Agent=Agent)
 
 if PYTHONPATH == 'python3':
     GAF.runcmd(f'qsub {join(CWD, f"{Agent}_313K.lammps.pbs")}')
@@ -290,7 +274,7 @@ while MoveOn == False:
     sims = []
     try:
         with open(join(STARTINGDIR, 'sims.txt'), 'r') as file:
-            next(file)
+            next(file) #Avoiding the first two lines
             next(file)
             filelist = file.readlines()
             for sim in filelist:
@@ -311,7 +295,6 @@ MOLSMILESList = [x[-1] for x in FirstGenSimList]
 
 # Here is where we will get the various values generated from the MD simulations
 for Molecule, MOLSMILES in FirstGenSimList:
-    print(Molecule, MOLSMILES)
     try:
         # Create a function to wait until all simulations from this generation are finished
         os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1', Molecule))
@@ -327,10 +310,7 @@ for Molecule, MOLSMILES in FirstGenSimList:
 
         ### Toxicity
         ToxNorm = random.uniform(0, 1)
-        # tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
-        # Partial_Result = tox21(MOLSMILES)
-        # Result = sum(Partial_Result)
-        # ToxNorm = Result/5
+        # ToxNorm = GAF.Toxicity(MOLSMILES)
 
         ### Viscosity
         # DVisc40 = GAF.GetVisc(STARTDIR, Molecule, 313)
@@ -368,17 +348,36 @@ for Molecule, MOLSMILES in FirstGenSimList:
         print(E)
         pass
 
-#Check if at least 'NumElite' molecules have a usable KVI, if so, will just use those as best performing molecules
-if MoleculeDatabase['KVI'].isna().sum() <= (GenerationSize - NumElite):
-    GenerationMolecules = pd.Series(MoleculeDatabase.KVI.values, index=MoleculeDatabase.ID).dropna().to_dict()
-# Else will compare values of molecules with highest KVisc at 100C, as this is main driver of KVI
-elif MoleculeDatabase['KViscosity100C'].isna().sum() <= (GenerationSize - NumElite):
-    GenerationMolecules = pd.Series(MoleculeDatabase.KViscosity100C.values, index=MoleculeDatabase.ID).dropna().to_dict()
-# Else assume that Molecules with higher molecular mass will more likely have improved VI
-else:
-    GenerationMolecules = pd.Series(MoleculeDatabase.MolMass.values, index=MoleculeDatabase.ID).to_dict()
+#### Generate Score
+ViscScores = MoleculeDatabase['DViscosity40C'].tolist()
+SCScores = MoleculeDatabase['SCScore'].tolist()
+DVIScores = MoleculeDatabase['DVI'].tolist()
+ToxicityScores = MoleculeDatabase['Toxicity'].tolist()
+SimilarityScores = MoleculeDatabase['SimilarityScore'].tolist()
+ThermalKScores = MoleculeDatabase['ThermalConductivity'].tolist()
+MoleculeNames = MoleculeDatabase['ID'].tolist()
 
-# Sort dictiornary according to target properties
+ViscosityScore  = list(zip(MoleculeNames, ViscScores)) 
+MolecularComplexityScore  = list(zip(MoleculeNames, SCScores)) 
+DVIScore  = list(zip(MoleculeNames, DVIScores)) 
+ToxicityScore  = list(zip(MoleculeNames, ToxicityScores)) 
+ThermalKScore = list(zip(MoleculeNames, ThermalKScores)) 
+
+# Apply the normalization function
+Viscosity_normalized_molecule_scores = [(1-x[1]) for x in GAF.min_max_normalize(ViscosityScore)]
+DVI_normalized_molecule_scores = [x[1] for x in GAF.min_max_normalize(DVIScore)]
+ThermalK_normalized_molecule_scores = [x[1] for x in GAF.min_max_normalize(ThermalKScore)]
+
+MoleculeDatabase['ViscNormalisedScore'] = Viscosity_normalized_molecule_scores
+MoleculeDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
+MoleculeDatabase['ThermalKNormalisedScore'] = ThermalK_normalized_molecule_scores
+MoleculeDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['ThermalKNormalisedScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
+MoleculeDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
+
+#Make a pandas object with just the scores and the molecule ID
+GenerationMolecules = pd.Series(MoleculeDatabase.NichedScore.values, index=MoleculeDatabase.ID).dropna().to_dict()
+
+# Sort dictiornary according to target score
 ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[1], reverse=True)
 
 #Convert tuple elements in sorted list back to lists 
@@ -390,25 +389,20 @@ for entry in ScoreSortedMolecules:
     entry.insert(1, MoleculeDatabase.iloc[Key]['MolObject'])
     entry.insert(2, MoleculeDatabase.iloc[Key]['MutationList'])
     entry.insert(3, MoleculeDatabase.iloc[Key]['HeavyAtoms'])
+    entry.insert(4, MoleculeDatabase.iloc[Key]['SMILES'])
 
-GenerationMolecules = ScoreSortedMolecules[:NumElite]
-
-# Generate score for each molecule
-
-# Apply niching to the scores
-
+#Save the update Master database and generation database
 MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
 GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation1Database.csv')
-
-sys.exit()
 
 ################################## Subsequent generations #################################################
 for generation in range(2, MaxGenerations + 1):
     GenerationTotalAttempts = 0
     GenSimList = []
 
-    GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'Viscosity40C',
-                                        'Viscosity100C', 'VI', 'ThermalConductivity', 'Toxicity', 'SCScore', 'Density40C'])
+    # Generation Dataframe to store molecules from each generation
+    GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
+                                            'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'ThermalConductivity', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
 
     os.chdir(STARTINGDIR)
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
@@ -425,7 +419,7 @@ for generation in range(2, MaxGenerations + 1):
         if len(GenerationMoleculeList) == GenerationSize:
             break
 
-        # Attempt mutation on each molecule, not moving on until a valid mutation has been suggested
+        # Attempt crossover/mutation on each molecule, not moving on until a valid mutation has been suggested
         while MutMol == None:
             attempts += 1
             GenerationTotalAttempts += 1
@@ -435,8 +429,16 @@ for generation in range(2, MaxGenerations + 1):
                 Fails += 1 
                 break
 
-            # Starting Molecule mol object
-            StartingMolecule = entry[1]
+            # Get two parents using 3-way tournament selection
+            Parent1 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
+            Parent2 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
+
+            # Attempt crossover
+            try:
+                result = GAF.Mol_Crossover(Chem.MolFromSmiles(Parent1), Chem.MolFromSmiles(Parent2))
+            except Exception as E:
+                pass
+
             # List containing last two successful mutations performed on molecule
             PreviousMutations = entry[2]
             # Number of heavy atoms
@@ -444,25 +446,33 @@ for generation in range(2, MaxGenerations + 1):
             # Molecule ID
             Name = f'Generation_{generation}_Molecule_{IDcounter}'
 
-            if NumHeavyAtoms > 42:
-                MutationList = ['RemoveAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveFragment', 'Mol_Crossover']
+            if NumHeavyAtoms > MaxNumHeavyAtoms * 0.8:
+                MutationList = ['RemoveAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveFragment']
             else:
                 MutationList = Mutations 
             
             print(f'\n#################################################################\nNumber of attempts: {attempts}')
-            print(f'Total Mutation Attempts: {GenerationTotalAttempts}')
+            print(f'Total Crossover and/or Mutation Attempts: {GenerationTotalAttempts}')
             print(f'GENERATION: {generation}')
 
-            # Randomly select a mutation, here is where we can set mutation probabilities
-            Mutation = rnd(MutationList)
+            #Decide whether to mutate molecule based on mutation rate
+            if random.random() <= MutationRate:
+                Mutate = True
+                print('Attempting to Mutate')
+            else:
+                Mutate = False
 
-            # Initialise Aromatic Ring
-            AromaticMolecule = fragments[-1]
+            if Mutate:
+                # Randomly select a mutation, here is where we can set mutation probabilities
+                Mutation = rnd(MutationList)
 
-            #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
-            result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
+                # Initialise Aromatic Ring
+                AromaticMolecule = fragments[-1]
+
+                #Perform mutation, return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
+                result = GAF.Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes, Atoms, showdiff, fragments)
             
-            if GAF.GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings=2) == None:
+            if GAF.GenMolChecks(result, MasterMoleculeList, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings=2) == None:
                 MutMol = None
         
             else:
@@ -470,7 +480,6 @@ for generation in range(2, MaxGenerations + 1):
                 MutMol = result[0] # Get Mol object of mutated molecule
                 MolMass = GAF.GetMolMass(MutMol) # Get estimate of of molecular mass 
                 MutMolSMILES = result[2] # SMILES of mutated molecule
-                Predecessor = result[3] # Get history of last two mutations performed on candidate
 
                 # Update previous mutations object
                 PreviousMutations.pop(0)
@@ -536,15 +545,12 @@ for generation in range(2, MaxGenerations + 1):
 
                     # Add candidate and it's data to master list
                     MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                                            MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
+                                            MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
                     
-                    GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                        MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=Predecessor)
-
                     # Generate list of molecules to simulate in this generation
-                    GenSimList.append(Name)
+                    GenSimList.append([Name, MutMolSMILES])
+                    MasterMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
                     print(f'Final Molecule SMILES: {MutMolSMILES}') 
-                    GenerationMoleculeList.append([result[2], result[0], PreviousMutations, NumHeavyAtoms, ID, MolMass, Predecessor])
                     IDcounter += 1
 
                 except Exception as E:
@@ -554,9 +560,9 @@ for generation in range(2, MaxGenerations + 1):
     #This is where we should call the simulation script
     CWD = join(STARTINGDIR, 'Molecules', f'Generation_{generation}')
     # Create array job for 40C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName=f"313K.lammps", Agent=Agent)
+    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, NumRuns, SimName=f"313K.lammps", Agent=Agent)
     # Create array job for 100C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, SimName=f"373K.lammps", Agent=Agent)
+    GAF.CreateArrayJob(STARTINGDIR, CWD, generation, NumRuns, SimName=f"373K.lammps", Agent=Agent)
 
     if PYTHONPATH == 'python3':
         GAF.runcmd(f'qsub {join(CWD, f"{Agent}_313K.lammps.pbs")}')
@@ -572,65 +578,113 @@ for generation in range(2, MaxGenerations + 1):
         runcmd(f'qstat > sims.txt')
         sims = []
         with open(join(STARTINGDIR, 'sims.txt'), 'r') as file:
-            next(file)
-            next(file)
-            filelist = file.readlines()
-            for sim in filelist:
-                if Agent in sim:
-                    sims.append(sim)
-                    print(sim)
+            try:
+                next(file)
+                next(file)
+                filelist = file.readlines()
+                for sim in filelist:
+                    if Agent in sim:
+                        sims.append(sim)
+                        print(sim)
 
-        # Check if array jobs have finished
-        if len(sims) != 0:
-            print('Waiting for 10 mins')
-            sleep(60)
-        else:
-            MoveOn = True
+                # Check if array jobs have finished
+                if len(sims) != 0:
+                    print('Waiting for 10 mins')
+                    sleep(60)
+                else:
+                    MoveOn = True
+            
+            except Exception as E:
+                print(E)
+                MoveOn = True
+                pass
         
-    for Molecule in GenSimList:
+    MOLSMILESList = [x[-1] for x in GenSimList]
+
+    # Here is where we will get the various values generated from the MD simulations
+    for Molecule, MOLSMILES in GenSimList:
         try:
-            # Create a function to wait until all simulations from this generation are finished
             os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}', Molecule))
             CWD = os.getcwd()
 
-            #Get Densities
-            Dens40 = float(GAF.GetDens(f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out'))
-            Dens100 = float(GAF.GetDens(f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out'))
+            ### Similarity Scores
+            Scores = GAF.TanimotoSimilarity(MOLSMILES, MOLSMILESList)
+            AvScore = 1 - (sum(Scores) / 50) # The higher the score, the less similar the molecule is to others
 
-            #Get Viscosities
-            DVisc40 = float(GAF.GetVisc(f'{CWD}/logGKvisc_{Molecule}_T313KP1atm.out'))
-            DVisc100 = float(GAF.GetVisc(f'{CWD}/logGKvisc_{Molecule}_T373KP1atm.out'))
+            ### SCScore
+            SCScore = GAF.SCScore(MOLSMILES)
+            SCScoreNorm = SCScore/5
 
-            #Attempt to get KVI and DVI
-            KVI = GAF.GetKVI(DVisc40=DVisc40, DVisc100=DVisc100, Dens40=Dens40, Dens100=Dens100, STARTINGDIR=STARTINGDIR)
-            DVI = GAF.GetDVI(DVisc40=DVisc40, DVisc100=DVisc100)
+            ### Toxicity
+            ToxNorm = random.uniform(0, 1)
+            # ToxNorm = GAF.Toxicity(MOLSMILES)
+
+            ### Viscosity
+            # DVisc40 = GAF.GetVisc(STARTDIR, Molecule, 313)
+            # DVisc100 = GAF.GetVisc(STARTDIR, Molecule, 373)
+            # Dens40 = GAF.GetDens(DensityFile)
+            # Dens100 = GAF.GetDens(DensityFile
+            DVisc40 = random.uniform(2, 30)
+            DVisc100 = random.uniform(2, 8)
+
+            ### Viscosity Index
+            # Dens40 = GAF.GetDens(DensityFile)
+            # Dens100 = GAF.GetDens(DensityFile)
+            # KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
+            DVI = GAF.GetDVI(DVisc40, DVisc100)
+
+            ### Thermal Conductivity
+            ThermalK = random.uniform(1, 3)
 
             #Update Molecule Database
             IDNumber = int(Molecule.split('_')[-1])
-            MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
-            MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
+            # MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
+            # MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
             MoleculeDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
             MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-            MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-            MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-            MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
+            # MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            # MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            # MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
             MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
-        except:
+            MoleculeDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
+            MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
+            MoleculeDatabase.at[IDNumber, 'ThermalConductivity'] = ThermalK
+            MoleculeDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
+
+        except Exception as E:
+            print(E)
             pass
 
-    #Check if at least 'NumElite' molecules have a usable KVI, if so, will just use those as best performing molecules
-    if MoleculeDatabase['KVI'].isna().sum() <= (GenerationSize - NumElite):
-        GenerationMolecules = pd.Series(MoleculeDatabase.KVI.values, index=MoleculeDatabase.ID).dropna().to_dict()
-    # Else will compare values of molecules with highest KVisc at 100C, as this is main driver of KVI
-    elif MoleculeDatabase['KViscosity100C'].isna().sum() <= (GenerationSize - NumElite):
-        GenerationMolecules = pd.Series(MoleculeDatabase.KViscosity100C.values, index=MoleculeDatabase.ID).dropna().to_dict()
-    # Else assume that Molecules with higher molecular mass will more likely have improved VI
-    else:
-        GenerationMolecules = pd.Series(MoleculeDatabase.MolMass.values, index=MoleculeDatabase.ID).to_dict()
+    #### Generate Score
+    ViscScores = MoleculeDatabase['DViscosity40C'].tolist()
+    SCScores = MoleculeDatabase['SCScore'].tolist()
+    DVIScores = MoleculeDatabase['DVI'].tolist()
+    ToxicityScores = MoleculeDatabase['Toxicity'].tolist()
+    SimilarityScores = MoleculeDatabase['SimilarityScore'].tolist()
+    ThermalKScores = MoleculeDatabase['ThermalConductivity'].tolist()
+    MoleculeNames = MoleculeDatabase['ID'].tolist()
 
-    #Generate Scores for Each Molecule
+    ViscosityScore  = list(zip(MoleculeNames, ViscScores)) 
+    MolecularComplexityScore  = list(zip(MoleculeNames, SCScores)) 
+    DVIScore  = list(zip(MoleculeNames, DVIScores)) 
+    ToxicityScore  = list(zip(MoleculeNames, ToxicityScores)) 
+    ThermalKScore = list(zip(MoleculeNames, ThermalKScores)) 
 
-    # Sort dictiornary according to target properties
+    # Apply the normalization function
+    Viscosity_normalized_molecule_scores = [(1-x[1]) for x in GAF.min_max_normalize(ViscosityScore)]
+    DVI_normalized_molecule_scores = [x[1] for x in GAF.min_max_normalize(DVIScore)]
+    ThermalK_normalized_molecule_scores = [x[1] for x in GAF.min_max_normalize(ThermalKScore)]
+
+    MoleculeDatabase['ViscNormalisedScore'] = Viscosity_normalized_molecule_scores
+    MoleculeDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
+    MoleculeDatabase['ThermalKNormalisedScore'] = ThermalK_normalized_molecule_scores
+    MoleculeDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['ThermalKNormalisedScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
+    MoleculeDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
+
+    #Make a pandas object with just the scores and the molecule ID
+    GenerationMolecules = pd.Series(MoleculeDatabase.NichedScore.values, index=MoleculeDatabase.ID).dropna().to_dict()
+
+    # Sort dictiornary according to target score
     ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[1], reverse=True)
 
     #Convert tuple elements in sorted list back to lists 
@@ -642,8 +696,10 @@ for generation in range(2, MaxGenerations + 1):
         entry.insert(1, MoleculeDatabase.iloc[Key]['MolObject'])
         entry.insert(2, MoleculeDatabase.iloc[Key]['MutationList'])
         entry.insert(3, MoleculeDatabase.iloc[Key]['HeavyAtoms'])
+        entry.insert(4, MoleculeDatabase.iloc[Key]['SMILES'])
+
     
-    MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabaseFinal.csv')
+    MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
     GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation{generation}_Database.csv')
 
 print(len(GenerationMoleculeList))
