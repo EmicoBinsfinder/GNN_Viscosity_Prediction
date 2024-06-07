@@ -1078,7 +1078,7 @@ def CalcBoxLen(MolMass, TargetDens, NumMols):
 
 def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime):
 
-    VelNumber = rnd.randint(0, 1000000)
+    VelNumber = random.randint(0, 1000000)
 
     if os.path.exists(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}"):
         print('Specified Moltemplate file already exists in this location, overwriting.')
@@ -1382,9 +1382,6 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
 
     return MutMol
 
-def fitfunc(MoleculeSMILES, Generation):
-    return random.randint(1, Generation*5000)
-
 def GetDens(DensityFile):
     try:
         with open(f'{DensityFile}', 'r+') as file:
@@ -1417,14 +1414,12 @@ def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, 
 
 def CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation, SimName, Agent, GenerationSize, NumElite):
     #Create an array job for each separate simulation
+    BotValue = 0
+
     if Generation == 1:
-        BotValue = 0
-        TopValue = 49
+        TopValue = NumRuns * GenerationSize
     else:
-        GenerationRange = Generation*(GenerationSize-NumElite) 
-        ListRange = list(range(GenerationRange, GenerationRange + (GenerationSize-NumElite)))
-        TopValue = ListRange[-1]
-        BotValue = ListRange[0]
+        TopValue = NumRuns *(GenerationSize - NumElite) 
 
     if os.path.exists(f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}"):
         print(f'Specified file already exists in this location, overwriting')
