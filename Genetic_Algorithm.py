@@ -58,6 +58,7 @@ from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
 from operator import itemgetter
 import os
+import glob
 import pandas as pd
 import random
 import numpy as np
@@ -71,12 +72,9 @@ DrawingOptions.bondLineWidth=1.8
 DrawingOptions.atomLabelFontSize=14
 
 ### Fragments
-Mols = ['CCCCCCCCCCCCCCCC(CC1CCCCC1)CC2CCCCC2', 'CCCCCCCCCCCCC(CCCCCCCCCCCC)C1CCCCC1',
-    'CCCCCCCCCCCCCCCC', 'CCCCC(CC)COC(=O)CCCCCCCCC(=O)OCC(CC)CCCC', 
-             'CCCCCCCCCCCCC(c1ccccc1)CCCCCCCCCCCC', 'CC(C)CCCC(C)CCCC(C)CCCCC(C)CCCC(C)CCCC(C)C', 'CC1=CC=CC2=CC=CC=C12',
-             'CCCCCCCCCCC(CCCCCCCCCC)CCCCCCCCCC', 'C(c1ccccc1)CCCCCC(c1ccccc1)CCCCCCC']
+Mols = ['CCCCCCCCCCCCCCCC', 'CCCCC(CC)COC(=O)CCCCCCCCC(=O)OCC(CC)CCCC', 'CC(C)CCCC(C)CCCC(C)CCCCC(C)CCCC(C)CCCC(C)C', 'CCCCCCCCCCC(CCCCCCCCCC)CCCCCCCCCC']
 
-fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C', 'C1CCCCC1', 'C1CCCC1', 'c1ccccc1']
+fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C']
 
 MoleculeDatabase = pd.read_csv('MoleculeDatabase.csv')
 
@@ -101,9 +99,10 @@ BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
 Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment', 'InsertAromatic', 'RemoveFragment']
 
 # GENETIC ALGORITHM HYPERPARAMETERS
+CopyCommand = 'copy'
 Silent = True # Edit outputs to only print if this flag is False
 NumElite = 25
-IDcounter = 0
+IDcounter = 1
 FirstGenerationAttempts = 0
 MasterMoleculeList = [] #Keeping track of all generated molecules
 FirstGenSimList = []
@@ -184,17 +183,25 @@ while len(MoleculeDatabase) < GenerationSize:
             # Go into directory for this generation
             os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
             
+            Foldername = f'{Name}_Test'
+
             # Make a directory for the current molecule if it can be parameterised 
-            GAF.runcmd(f'mkdir {Name}_Test')
+            GAF.runcmd(f'mkdir {Foldername}')
 
             # Enter molecule specific directory
-            os.chdir(join(os.getcwd(), f'{Name}_Test'))
+            os.chdir(join(os.getcwd(), Foldername))
 
             #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
             CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
-            GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
-            GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
 
+            #Copy molecule pdb to molecule directory
+            PDBFile = join(STARTINGDIR, f'{Name}.pdb')
+            GAF.runcmd(f'{CopyCommand} "{PDBFile}" {join(CWD, f"{Name}.pdb")}')
+            
+            #Copy molecule lt file to molecule directory
+            LTFile = join(STARTINGDIR, f'{Name}.lt')
+            GAF.runcmd(f'{CopyCommand} "{LTFile}" {join(CWD, f"{Name}.lt")}')
+            
             #Get estimate for Number of molecules 
             HMutMol = Chem.AddHs(MutMol)
             NumMols = int(NumAtoms/HMutMol.GetNumAtoms()) # Maybe add field seeing how many mols were added to box
@@ -254,34 +261,27 @@ for MolParam in FirstGenSimList:
     for x in list(range(NumRuns)):
         os.chdir(STARTINGDIR)
         try:
-            # Set feature definition file path to OPLS or LOPLS depending on user choice 
-            if LOPLS:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
-            else:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
-            
-            #Attempt to parameterise with OPLS
-            GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
-
-            #Get molecule charge
-            charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
-
-            #If successful, generate a PDB of molecule to use with Packmol
-            GAF.GeneratePDB(MutMolSMILES, PATH=join(STARTINGDIR, f'{Name}.pdb'))
-
             # Go into directory for this generation
             os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
             
+            Foldername = f'{Name}_Run_{RunNum}'
+
             # Make a directory for the current molecule if it can be parameterised 
-            GAF.runcmd(f'mkdir {Name}_Run_{RunNum}')
+            GAF.runcmd(f'mkdir {Foldername}')
 
             # Enter molecule specific directory
-            os.chdir(join(os.getcwd(), f'{Name}_Run_{RunNum}'))
+            os.chdir(join(os.getcwd(), Foldername))
 
             #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
             CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
-            GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
-            GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
+
+            #Copy molecule pdb to molecule directory
+            PDBFile = join(STARTINGDIR, f'{Name}.pdb')
+            GAF.runcmd(f'{CopyCommand} "{PDBFile}" {join(CWD, f"{Name}.pdb")}')
+            
+            #Copy molecule lt file to molecule directory
+            LTFile = join(STARTINGDIR, f'{Name}.lt')
+            GAF.runcmd(f'{CopyCommand} "{LTFile}" {join(CWD, f"{Name}.lt")}')
 
             #Get estimate for Number of molecules 
             NumMols = int(NumAtoms/HMutMol.GetNumAtoms()) # Maybe add field seeing how many mols were added to box
@@ -329,6 +329,24 @@ if PYTHONPATH == 'python3':
     GAF.runcmd(f'qsub {join(CWD, f"{Agent}_373K.lammps.pbs")}')
 
 os.chdir(STARTINGDIR)
+
+### REMOVE UNNECESSARY FILES
+directory = STARTINGDIR
+pattern = f'Generation_{Generation}_Molecule_*'  # Example: 'file_*.txt' to match files like file_1.txt, file_2.txt, etc.
+
+# Get a list of all files matching the pattern
+files_to_remove = glob.glob(os.path.join(directory, pattern))
+
+# Remove each file
+for file_path in files_to_remove:
+    try:
+        os.remove(file_path)
+        print(f'Removed: {file_path}')
+    except Exception as e:
+        print(f'Error removing {file_path}: {e}')
+        pass
+
+sys.exit()
 
 # Wait until array jobs have finished
 MoveOn = False
@@ -640,34 +658,27 @@ for generation in range(2, MaxGenerations + 1):
         for x in list(range(NumRuns)):
             os.chdir(STARTINGDIR)
             try:
-                # Set feature definition file path to OPLS or LOPLS depending on user choice 
-                if LOPLS:
-                    LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
-                else:
-                    LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
-                
-                #Attempt to parameterise with OPLS
-                GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
-
-                #Get molecule charge
-                charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
-
-                #If successful, generate a PDB of molecule to use with Packmol
-                GAF.GeneratePDB(MutMolSMILES, PATH=join(STARTINGDIR, f'{Name}.pdb'))
-
                 # Go into directory for this generation
                 os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
                 
+                Foldername = f'{Name}_Run_{RunNum}'
+
                 # Make a directory for the current molecule if it can be parameterised 
-                GAF.runcmd(f'mkdir {Name}_Run_{RunNum}')
+                GAF.runcmd(f'mkdir {Foldername}')
 
                 # Enter molecule specific directory
-                os.chdir(join(os.getcwd(), f'{Name}_Run_{RunNum}'))
+                os.chdir(join(os.getcwd(), Foldername))
 
                 #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
                 CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
-                GAF.CheckMoveFile(Name, STARTINGDIR, 'lt', CWD)
-                GAF.CheckMoveFile(Name, STARTINGDIR, 'pdb', CWD)
+
+                #Copy molecule pdb to molecule directory
+                PDBFile = join(STARTINGDIR, f'{Name}.pdb')
+                GAF.runcmd(f'{CopyCommand} "{PDBFile}" {join(CWD, f"{Name}.pdb")}')
+                
+                #Copy molecule lt file to molecule directory
+                LTFile = join(STARTINGDIR, f'{Name}.lt')
+                GAF.runcmd(f'{CopyCommand} "{LTFile}" {join(CWD, f"{Name}.lt")}')
 
                 #Get estimate for Number of molecules 
                 NumMols = int(NumAtoms/HMutMol.GetNumAtoms()) # Maybe add field seeing how many mols were added to box
@@ -715,6 +726,21 @@ for generation in range(2, MaxGenerations + 1):
         GAF.runcmd(f'qsub {join(CWD, f"{Agent}_373K.lammps.pbs")}')
 
     os.chdir(STARTINGDIR)
+
+    ### REMOVE UNNECESSARY FILES
+    directory = STARTINGDIR
+    pattern = f'Generation_{Generation}_Molecule_*'  # Example: 'file_*.txt' to match files like file_1.txt, file_2.txt, etc.
+
+    # Get a list of all files matching the pattern
+    files_to_remove = glob.glob(os.path.join(directory, pattern))
+
+    # Remove each file
+    for file_path in files_to_remove:
+        try:
+            os.remove(file_path)
+            print(f'Removed: {file_path}')
+        except Exception as e:
+            print(f'Error removing {file_path}: {e}')
 
     # Wait until array jobs have finished
     MoveOn = False

@@ -1414,7 +1414,7 @@ def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, 
 
 def CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation, SimName, Agent, GenerationSize, NumElite):
     #Create an array job for each separate simulation
-    BotValue = 0
+    BotValue = 1
 
     if Generation == 1:
         TopValue = NumRuns * GenerationSize
