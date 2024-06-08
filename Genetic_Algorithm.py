@@ -247,7 +247,10 @@ while len(MoleculeDatabase) < GenerationSize:
 os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
 
 for dir in os.listdir(os.getcwd()):
-    shutil.rmtree(dir)
+    try:
+        shutil.rmtree(dir)
+    except NotADirectoryError:
+        pass
 
 #### Create duplicate trajectories for each molecule
 
@@ -321,7 +324,7 @@ CWD = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # Create and run array job for 40C viscosity
 GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=1, SimName='313K.lammps', Agent=Agent, GenerationSize=GenerationSize, NumElite=NumElite)
 
-# Create and run array job for 100C viscosity
+# Create and run array job for 100C viscosity   
 GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=1, SimName='373K.lammps', Agent=Agent, GenerationSize=GenerationSize, NumElite=NumElite)
 
 if PYTHONPATH == 'python3':
@@ -346,7 +349,6 @@ for file_path in files_to_remove:
         print(f'Error removing {file_path}: {e}')
         pass
 
-sys.exit()
 
 # Wait until array jobs have finished
 MoveOn = False
@@ -378,7 +380,7 @@ MOLSMILESList = [x[-1] for x in FirstGenSimList]
 for Molecule, MOLSMILES, _, _ in FirstGenSimList:
     try:
         # Create a function to wait until all simulations from this generation are finished
-        os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1', Molecule))
+        os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}', Molecule))
         CWD = os.getcwd()
 
         ### Similarity Scores
@@ -644,7 +646,10 @@ for generation in range(2, MaxGenerations + 1):
     os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
 
     for dir in os.listdir(os.getcwd()):
-        shutil.rmtree(dir)
+        try:
+            shutil.rmtree(dir)
+        except NotADirectoryError:
+            pass
 
     #### Create duplicate trajectories for each molecule
 
