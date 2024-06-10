@@ -100,7 +100,7 @@ Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment
 # GENETIC ALGORITHM HYPERPARAMETERS
 CopyCommand = 'copy'
 Silent = True # Edit outputs to only print if this flag is False
-NumElite = 10
+NumElite = 5
 IDcounter = 1
 FirstGenerationAttempts = 0
 MasterMoleculeList = [] #Keeping track of all generated molecules
@@ -109,7 +109,7 @@ MaxNumHeavyAtoms = 50
 MinNumHeavyAtoms = 5
 MutationRate = 0.4
 showdiff = False # Whether or not to display illustration of each mutation
-GenerationSize = 20
+GenerationSize = 10
 LOPLS = False # Whether or not to use OPLS or LOPLS, False uses OPLS
 MaxGenerations = 3
 MaxMutationAttempts = 200
@@ -317,7 +317,7 @@ for MolParam in FirstGenSimList:
             traceback.print_exc()
             pass
 
-# Run MD simulations and retreive performance 
+### Run MD simulations 
 Generation = 1
 CWD = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # Create and run array job for 40C viscosity
@@ -348,7 +348,7 @@ for file_path in files_to_remove:
         print(f'Error removing {file_path}: {e}')
         pass
 
-# Wait until array jobs have finished
+### Wait until array jobs have finished
 MoveOn = False
 while MoveOn == False:
     runcmd(f'qstat > sims.txt')
@@ -411,7 +411,7 @@ for Molecule, MOLSMILES, _, _ in FirstGenSimList:
 
         ### Similarity Scores
         Scores = GAF.TanimotoSimilarity(MOLSMILES, MOLSMILESList)
-        AvScore = 1 - (sum(Scores) / 50) # The higher the score, the less similar the molecule is to others
+        AvScore = 1 - (sum(Scores) / GenerationSize) # The higher the score, the less similar the molecule is to others
 
         ### SCScore
         SCScore = GAF.SCScore(MOLSMILES)
@@ -542,6 +542,8 @@ for generation in range(2, MaxGenerations + 1):
             Parent1 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
             Parent2 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
 
+            print(Parent1, Parent2)
+
             # Attempt crossover
             try:
                 result = GAF.Mol_Crossover(Chem.MolFromSmiles(Parent1), Chem.MolFromSmiles(Parent2))
@@ -669,6 +671,7 @@ for generation in range(2, MaxGenerations + 1):
                     # Generate list of molecules to simulate in this generation
                     GenSimList.append([Name, MutMolSMILES, BoxL, NumMols])
                     MasterMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
+                    GenerationMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
                     print(f'Final Molecule SMILES: {MutMolSMILES}') 
                     IDcounter += 1
 
@@ -757,12 +760,10 @@ for generation in range(2, MaxGenerations + 1):
     # Create array job for 40C viscosity
     GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=generation, SimName='313K.lammps', GenerationSize=GenerationSize, Agent=Agent, NumElite=NumElite)
     # Create array job for 100C viscosity
-    GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=generation, SimName='313K.lammps', GenerationSize=GenerationSize, Agent=Agent, NumElite=NumElite)
+    GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=generation, SimName='373K.lammps', GenerationSize=GenerationSize, Agent=Agent, NumElite=NumElite)
 
     if PYTHONPATH == 'python3':
         GAF.runcmd(f'qsub {join(CWD, f"{Agent}_313K.lammps.pbs")}')
-
-    if PYTHONPATH == 'python3':
         GAF.runcmd(f'qsub {join(CWD, f"{Agent}_373K.lammps.pbs")}')
 
     os.chdir(STARTINGDIR)
@@ -848,7 +849,7 @@ for generation in range(2, MaxGenerations + 1):
 
             ### Similarity Scores
             Scores = GAF.TanimotoSimilarity(MOLSMILES, MOLSMILESList)
-            AvScore = 1 - (sum(Scores) / 50) # The higher the score, the less similar the molecule is to others
+            AvScore = 1 - (sum(Scores) / GenerationSize) # The higher the score, the less similar the molecule is to others
 
             ### SCScore
             SCScore = GAF.SCScore(MOLSMILES)

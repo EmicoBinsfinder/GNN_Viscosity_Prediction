@@ -944,9 +944,6 @@ def CheckSubstruct(MutMol):
     else:
         return False
 
-def fitfunc(MoleculeSMILES, Generation):
-    return random.randint(1, Generation*5000)
-
 # Function to run a command from a python script
 def runcmd(cmd, verbose = False, *args, **kwargs):
     #bascially allows python to run a bash command, and the code makes sure 
