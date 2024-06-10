@@ -32,7 +32,9 @@ from os import getcwd
 from os import listdir
 import os
 import gzip
+import shutil
 import json
+import fnmatch
 import math
 import six
 
@@ -1858,6 +1860,7 @@ def KTournament(Elites, K=3):
     return Winner
 
 def min_max_normalize(scores):
+
     if not scores:
         return []
 
@@ -1874,3 +1877,25 @@ def min_max_normalize(scores):
     ]
 
     return normalized_scores
+
+
+def list_generation_directories(root_dir, StringPattern):
+    # List to hold the names of directories containing 'Generation'
+    generation_dirs = []
+
+    # Iterate through the items in the root directory
+    for item in os.listdir(root_dir):
+        item_path = os.path.join(root_dir, item)
+        
+        # Check if the item is a directory and its name contains 'Generation'
+        if os.path.isdir(item_path) and fnmatch.fnmatch(item, f'*{StringPattern}*'):
+            generation_dirs.append(item)
+    
+    return generation_dirs
+
+def move_directory(src, dst):
+    # Ensure the destination directory exists
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    
+    # Move the directory
+    shutil.move(src, dst)
