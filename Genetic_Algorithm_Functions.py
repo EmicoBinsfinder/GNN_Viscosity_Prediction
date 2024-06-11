@@ -1075,16 +1075,16 @@ def CalcBoxLen(MolMass, TargetDens, NumMols):
     BoxLRounded = int(BoxL)
     return BoxLRounded
 
-def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime):
+def MakeLAMMPSFile(Name, CWD, Temp, GKRuntime, Run):
 
     VelNumber = random.randint(0, 1000000)
 
-    if os.path.exists(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}"):
+    if os.path.exists(f"{os.path.join(CWD, f'{Run}_system_{Temp}K.lammps')}"):
         print('Specified Moltemplate file already exists in this location, overwriting.')
-        os.remove(f"{os.path.join(CWD, f'{Name}_system_{Temp}K.lammps')}")
+        os.remove(f"{os.path.join(CWD, f'{Run}_system_{Temp}K.lammps')}")
 
     # Write LAMMPS file for
-    with open(os.path.join(CWD, f'{Name}_system_{Temp}K.lammps'), 'x') as file:
+    with open(os.path.join(CWD, f'{Run}_system_{Temp}K.lammps'), 'x') as file:
         file.write(f"""
 # Setup parameters
 variable       		T equal {Temp} # Equilibrium temperature [K]
@@ -1433,13 +1433,10 @@ def CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation, SimName, Agent, Genera
 module load intel-suite/2020.2
 module load mpi/intel-2019.6.166
 
-cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/Generation_{Generation}/Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}
-mpiexec ~/tmp/bin/lmp -in Generation_{Generation}_Molecule_${{PBS_ARRAY_INDEX}}_system_{SimName}
+cd /rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/Molecules/Generation_{Generation}/Run_${{PBS_ARRAY_INDEX}}
+mpiexec ~/tmp/bin/lmp -in Run_${{PBS_ARRAY_INDEX}}_system_{SimName}
 """)
     os.rename(f"{os.path.join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', f'{Agent}_{SimName}.pbs')}", f"{os.path.join(CWD, f'{Agent}_{SimName}.pbs')}")
-
-def CreateArrayJobMultiRun(STARTINGDIR, CWD, Generation, SimName, Agent):
-    pass
 
 def GetDVI(DVisc40, DVisc100):
     """
@@ -1875,7 +1872,6 @@ def min_max_normalize(scores):
 
     return normalized_scores
 
-
 def list_generation_directories(root_dir, StringPattern):
     # List to hold the names of directories containing 'Generation'
     generation_dirs = []
@@ -1891,8 +1887,30 @@ def list_generation_directories(root_dir, StringPattern):
     return generation_dirs
 
 def move_directory(src, dst):
+
     # Ensure the destination directory exists
     os.makedirs(os.path.dirname(dst), exist_ok=True)
     
     # Move the directory
     shutil.move(src, dst)
+
+def find_files_with_extension(directory, extension):
+    matches = []
+    for root, dirnames, filenames in os.walk(directory):
+        for filename in filenames:
+            if filename.endswith(extension):
+                matches.append(os.path.join(root, filename))
+    return matches
+
+def extract_molecule_name(file_path):
+    # Define the regex pattern to match 'Generation_X_Molecule_Y'
+    pattern = r"Generation_\d+_Molecule_\d+"
+    
+    # Search for the pattern in the file path
+    match = re.search(pattern, file_path)
+    
+    # If a match is found, return it
+    if match:
+        return match.group(0)
+    else:
+        return None

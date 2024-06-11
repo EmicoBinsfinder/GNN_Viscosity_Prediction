@@ -266,7 +266,7 @@ for MolParam in FirstGenSimList:
             # Go into directory for this generation
             os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
             
-            Foldername = f'{Name}_Run_{RunNum}'
+            Foldername = f'Run_{RunNum}'
 
             # Make a directory for the current molecule if it can be parameterised 
             GAF.runcmd(f'mkdir {Foldername}')
@@ -298,8 +298,8 @@ for MolParam in FirstGenSimList:
             GAF.MakeMoltemplateFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
 
             # Make LAMMPS files
-            GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000)
-            GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000)            
+            GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000, Run=Foldername)
+            GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000, Run=Foldername)            
 
             if PYTHONPATH == 'python3':
                 GAF.runcmd(f'packmol < {Name}.inp')
@@ -373,30 +373,26 @@ while MoveOn == False:
         MoveOn = True
 
 ### Reformat directories so that properties can be calculated 
+MOLIDList = [x[0] for x in FirstGenSimList]
 GenDirectory = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 
 # List of simulation directories
-directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Generation') 
-MolGenerations = [x.split('_') for x in directories_with_generation]
-MolGenerations = ['_'.join(x[:4]) for x in MolGenerations]
-GenDirectories = list(set(MolGenerations))
+directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Run') 
 
 os.chdir(join(os.getcwd(), 'Molecules', 'Generation_1'))
-for Mol in GenDirectories:
-    Num = 1
-    MolDirs = []
+for MolID in MOLIDList:
+    GAF.runcmd(f'mkdir {MolID}')
+
+Num = 1
+for RunDir in directories_with_generation:
     try:
-        GAF.runcmd(f'mkdir {Mol}')
-
-        MolDirs = GAF.list_generation_directories(os.getcwd(), Mol)
-        X1 = [x for x in MolDirs if '_'.join(x.split('_')[:4]) == Mol]
-        MolDirs = [x for x in X1 if x != Mol]
-
-        for Dir in MolDirs:
-            source_directory = join(os.getcwd(), Dir)
-            destination_directory = join(os.getcwd(), Mol, f'Run_{Num}')
-            GAF.move_directory(source_directory, destination_directory)
-            Num += 1
+        os.chdir(join(GenDirectory, RunDir))
+        PDBNamePath = GAF.find_files_with_extension(os.getcwd(), '.pdb')[0]
+        PDBName = GAF.extract_molecule_name(PDBNamePath)
+        source_directory = join(GenDirectory, RunDir)
+        destination_directory = join(GenDirectory, PDBName, RunDir)
+        GAF.move_directory(source_directory, destination_directory)
+        Num +=1
     except:
         pass
 
@@ -704,7 +700,7 @@ for generation in range(2, MaxGenerations + 1):
                 # Go into directory for this generation
                 os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
                 
-                Foldername = f'{Name}_Run_{RunNum}'
+                Foldername = f'Run_{RunNum}'
 
                 # Make a directory for the current molecule if it can be parameterised 
                 GAF.runcmd(f'mkdir {Foldername}')
@@ -736,8 +732,8 @@ for generation in range(2, MaxGenerations + 1):
                 GAF.MakeMoltemplateFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
 
                 # Make LAMMPS files
-                GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000)
-                GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000)            
+                GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000, Run=Foldername)
+                GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000, Run=Foldername)            
 
                 if PYTHONPATH == 'python3':
                     GAF.runcmd(f'packmol < {Name}.inp')
@@ -812,30 +808,26 @@ for generation in range(2, MaxGenerations + 1):
                 pass
     
     ### Reformat directories so that properties can be calculated 
+    MOLIDList = [x[0] for x in GenSimList]
     GenDirectory = join(STARTINGDIR, 'Molecules', f'Generation_{generation}')
 
     # List of simulation directories
-    directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Generation') 
-    MolGenerations = [x.split('_') for x in directories_with_generation]
-    MolGenerations = ['_'.join(x[:4]) for x in MolGenerations]
-    GenDirectories = list(set(MolGenerations))
+    directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Run') 
 
     os.chdir(join(os.getcwd(), 'Molecules', f'Generation_{generation}'))
-    for Mol in GenDirectories:
-        Num = 1
-        MolDirs = []
+    for MolID in MOLIDList:
+        GAF.runcmd(f'mkdir {MolID}')
+
+    Num = 1
+    for RunDir in directories_with_generation:
         try:
-            GAF.runcmd(f'mkdir {Mol}')
-
-            MolDirs = GAF.list_generation_directories(os.getcwd(), Mol)
-            X1 = [x for x in MolDirs if '_'.join(x.split('_')[:4]) == Mol]
-            MolDirs = [x for x in X1 if x != Mol]
-
-            for Dir in MolDirs:
-                source_directory = join(os.getcwd(), Dir)
-                destination_directory = join(os.getcwd(), Mol, f'Run_{Num}')
-                GAF.move_directory(source_directory, destination_directory)
-                Num += 1
+            os.chdir(join(GenDirectory, RunDir))
+            PDBNamePath = GAF.find_files_with_extension(os.getcwd(), '.pdb')[0]
+            PDBName = GAF.extract_molecule_name(PDBNamePath)
+            source_directory = join(GenDirectory, RunDir)
+            destination_directory = join(GenDirectory, PDBName, RunDir)
+            GAF.move_directory(source_directory, destination_directory)
+            Num +=1
         except:
             pass
 
