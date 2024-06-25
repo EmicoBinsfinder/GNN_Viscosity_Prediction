@@ -1316,7 +1316,7 @@ fix          fxave2 all ave/time $d 1 $d v_visc file visc.txt
 # save diffusion coefficient to a file
 fix          fxave3 all ave/time $d 1 $d v_vacf file diff_coeff.txt
 
-dump        LAMMPS all custom $d NVE_Prod_{Name}_${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
+#dump        LAMMPS all custom $d NVE_Prod_{Name}_${{T}}KP1atm.lammpstrj id mol type xu yu zu mass q
 
 run          {GKRuntime}
 

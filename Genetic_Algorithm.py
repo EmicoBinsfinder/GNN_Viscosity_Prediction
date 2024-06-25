@@ -423,32 +423,30 @@ for Molecule, MOLSMILES, _, _ in FirstGenSimList:
         SCScoreNorm = SCScore/5
 
         ### Toxicity
-        ToxNorm = random.uniform(0, 1)
-        # ToxNorm = GAF.Toxicity(MOLSMILES)
+        ToxNorm = GAF.Toxicity(MOLSMILES)
+
+        DensityFile40 = f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out'
+        DensityFile100 = f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out'
 
         ### Viscosity
-        # DVisc40 = GAF.GetVisc(STARTDIR, Molecule, 313)
-        # DVisc100 = GAF.GetVisc(STARTDIR, Molecule, 373)
-        # Dens40 = GAF.GetDens(DensityFile)
-        # Dens100 = GAF.GetDens(DensityFile
-        DVisc40 = random.uniform(2, 30)
-        DVisc100 = random.uniform(2, 8)
+        DVisc40 = GAF.GetVisc(STARTINGDIR, Molecule, 313)
+        DVisc100 = GAF.GetVisc(STARTINGDIR, Molecule, 373)
+        Dens40 = GAF.GetDens(DensityFile40)
+        Dens100 = GAF.GetDens(DensityFile100)
 
-        ### Viscosity Index
-        # Dens40 = GAF.GetDens(DensityFile)
-        # Dens100 = GAF.GetDens(DensityFile)
-        # KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
+        ## Viscosity Index
+        KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
         DVI = GAF.GetDVI(DVisc40, DVisc100)
 
         #Update Molecule Database
         IDNumber = int(Molecule.split('_')[-1])
-        # MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
-        # MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
+        MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
+        MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
         MoleculeDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
         MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-        # MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-        # MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-        # MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
+        MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+        MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+        MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
         MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
         MoleculeDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
         MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
@@ -852,32 +850,30 @@ for generation in range(2, MaxGenerations + 1):
             SCScoreNorm = SCScore/5
 
             ### Toxicity
-            ToxNorm = random.uniform(0, 1)
-            # ToxNorm = GAF.Toxicity(MOLSMILES)
+            ToxNorm = GAF.Toxicity(MOLSMILES)
+
+            DensityFile40 = f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out'
+            DensityFile100 = f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out'
 
             ### Viscosity
-            # DVisc40 = GAF.GetVisc(STARTDIR, Molecule, 313)
-            # DVisc100 = GAF.GetVisc(STARTDIR, Molecule, 373)
-            # Dens40 = GAF.GetDens(DensityFile)
-            # Dens100 = GAF.GetDens(DensityFile
-            DVisc40 = random.uniform(2, 30)
-            DVisc100 = random.uniform(2, 8)
+            DVisc40 = GAF.GetVisc(STARTINGDIR, Molecule, 313)
+            DVisc100 = GAF.GetVisc(STARTINGDIR, Molecule, 373)
+            Dens40 = GAF.GetDens(DensityFile40)
+            Dens100 = GAF.GetDens(DensityFile100)
 
-            ### Viscosity Index
-            # Dens40 = GAF.GetDens(DensityFile)
-            # Dens100 = GAF.GetDens(DensityFile)
-            # KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
+            ## Viscosity Index
+            KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
             DVI = GAF.GetDVI(DVisc40, DVisc100)
 
             #Update Molecule Database
             IDNumber = int(Molecule.split('_')[-1])
-            # MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
-            # MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
+            MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
+            MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
             MoleculeDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
             MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-            # MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-            # MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-            # MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
+            MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
             MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
             MoleculeDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
             MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
