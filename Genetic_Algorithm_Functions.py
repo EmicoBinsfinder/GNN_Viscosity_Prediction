@@ -14,7 +14,7 @@ import pandas as pd
 import re
 from math import log10
 import os
-# from gt4sd.properties import PropertyPredictorRegistry
+from gt4sd.properties import PropertyPredictorRegistry
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
@@ -1608,12 +1608,12 @@ def SCScore(MolSMILES, WeightPath=None):
     (smi, sco) = model.get_score_from_smi(MolSMILES)
     return sco
 
-# def Toxicity(MOLSMILES):
-#     tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
-#     Partial_Result = tox21(MOLSMILES)
-#     Result = sum(Partial_Result)
-#     ToxNorm = Result/5
-#     return ToxNorm
+def Toxicity(MOLSMILES):
+    tox21 = PropertyPredictorRegistry.get_property_predictor('tox21', {'algorithm_version': 'v0'})
+    Partial_Result = tox21(MOLSMILES)
+    Result = sum(Partial_Result)
+    ToxNorm = Result/5
+    return ToxNorm
 
 def TanimotoSimilarity(SMILES, SMILESList):
     # Calculate Tanimoto Similarity between target molecule and every other molecule in that population, crossover between molecules and least similar mols to it?
@@ -1816,8 +1816,6 @@ def GetVisc(STARTDIR, Molecule, Temp):
             pass
 
     try:
-        # Plot average value for each timestep
-
         DataframeEinstein = DataframeEinstein.dropna()
         DataframeGK = DataframeGK.dropna()
         DataframeGK['Average'] = DataframeGK.mean(axis=1)
@@ -1840,12 +1838,16 @@ def GetVisc(STARTDIR, Molecule, Temp):
         ViscosityAv = round((DataframeGKViscList_Average[-1]), 2)
         ViscosityAvEinstein = round((DataframeEinsteinList_Average[-1]), 2)
 
+        if ViscosityAv > 0:
+            Viscosity = ViscosityAv
+        else:
+            Viscosity = ViscosityAvEinstein
+
     except Exception as E:
         print(E)
-        ViscosityAv = None
-        ViscosityAvEinstein = None
+        Viscosity = None
 
-    return ViscosityAv, ViscosityAvEinstein
+    return Viscosity
 
 def KTournament(Elites, K=3):
     ElitePop = [[x[-2], x[-1]] for x in Elites]
