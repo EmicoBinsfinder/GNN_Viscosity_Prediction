@@ -64,7 +64,7 @@ import random
 import numpy as np
 import shutil
 import traceback
-# from gt4sd.properties import PropertyPredictorRegistry
+from gt4sd.properties import PropertyPredictorRegistry
 
 DrawingOptions.includeAtomNumbers=True
 DrawingOptions.bondLineWidth=1.8
@@ -75,14 +75,12 @@ Mols = ['CCCCCCCCCCCCCCCC', #Hexadecane
         'CC(C)CCCCCCCOC(=O)CCCCC(=O)OCCCCCCCC(C)C', #DIDA
         'CCCC(CCCCC(CCC)CCC)CCC', #4-9-di-n-propyldodecane
         'CCCCCCCC=C(CCCCCCCC)CCCCCCCC',  #9-n-octyl-8-heptadecene 
-        '', 
+        'CC(CCCCCCCCCCCCC)C', #2-methylpentadecane 
         'CCCCC(CC)COC(=O)CCCCCCCCC(=O)OCC(CC)CCCC', # Bis2(ethylhexyl)sebacate
         'CC(C)CCCC(C)CCCC(C)CCCCC(C)CCCC(C)CCCC(C)C', #Squalane
-        'CCCCCCCCCCC(CCCCCCCCCC)CCCCCCCCCC'] #11 Decyl Heneicosane (PAO equivalent)
+        'CCCCCCCC(CCCCCCC)CCCCCC '] #8-n-hexylpentadecane 
 
 fragments = ['CCCC', 'CCCCC', 'C(CC)CCC', 'CCC(CCC)CC', 'CCCC(C)CC', 'CCCCCCCCC', 'CCCCCCCC', 'CCCCCC', 'C(CCCCC)C']
-
-MoleculeDatabase = pd.read_csv('MoleculeDatabase.csv')
 
 Mols = [Chem.MolFromSmiles(x) for x in Mols]
 fragments = [Chem.MolFromSmiles(x) for x in fragments]
@@ -121,13 +119,13 @@ LOPLS = False # Whether or not to use OPLS or LOPLS, False uses OPLS
 MaxGenerations = 100
 MaxMutationAttempts = 200
 Fails = 0
-NumRuns = 3
-NumAtoms = 12000
+NumRuns = 5
+NumAtoms = 10000
 Agent = 'Agent1'
 
-PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
+#PYTHONPATH = 'C:/Users/eeo21/AppData/Local/Programs/Python/Python310/python.exe'
 STARTINGDIR = deepcopy(os.getcwd())
-# PYTHONPATH = 'python3'
+PYTHONPATH = 'python3'
 GAF.runcmd(f'mkdir Molecules')
 os.chdir(join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
@@ -173,9 +171,9 @@ while len(MoleculeDatabase) < GenerationSize:
 
             # Set feature definition file path to OPLS or LOPLS depending on user choice 
             if LOPLS:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
             else:
-                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
             
             #Attempt to parameterise with OPLS
             GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -189,7 +187,7 @@ while len(MoleculeDatabase) < GenerationSize:
             # Go into directory for this generation
             os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
             
-            Foldername = f'{Name}_Test'
+            Foldername = f'{Name}'
 
             # Make a directory for the current molecule if it can be parameterised 
             GAF.runcmd(f'mkdir {Foldername}')
@@ -249,15 +247,6 @@ while len(MoleculeDatabase) < GenerationSize:
             continue     
     FirstGenerationAttempts += 1
 
-### Delete test directories
-os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
-
-for dir in os.listdir(os.getcwd()):
-    try:
-        shutil.rmtree(dir)
-    except NotADirectoryError:
-        pass
-
 #### Create duplicate trajectories for each molecule
 
 RunNum = 1
@@ -272,57 +261,30 @@ for MolParam in FirstGenSimList:
         try:
             # Go into directory for this generation
             os.chdir(join(STARTINGDIR, 'Molecules', 'Generation_1'))
-            
+
             Foldername = f'Run_{RunNum}'
 
             # Make a directory for the current molecule if it can be parameterised 
             GAF.runcmd(f'mkdir {Foldername}')
 
-            # Enter molecule specific directory
-            os.chdir(join(os.getcwd(), Foldername))
+            FilesDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Name}')
+            CurDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Foldername}')
 
-            #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
-            CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
-
-            #Copy molecule pdb to molecule directory
-            PDBFile = join(STARTINGDIR, f'{Name}.pdb')
-            GAF.runcmd(f'{CopyCommand} "{PDBFile}" {join(CWD, f"{Name}.pdb")}')
-            
-            #Copy molecule lt file to molecule directory
-            LTFile = join(STARTINGDIR, f'{Name}.lt')
-            GAF.runcmd(f'{CopyCommand} "{LTFile}" {join(CWD, f"{Name}.lt")}')
-
-            #Get estimate for Number of molecules 
-            NumMols = int(NumAtoms/HMutMol.GetNumAtoms()) # Maybe add field seeing how many mols were added to box
-
-            # Estimate starting box length
-            BoxL = GAF.CalcBoxLen(MolMass=MolMass, TargetDens=0.8, NumMols=NumMols)
-
-            # Make packmol files
-            GAF.MakePackmolFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
-
-            # Make Moltemplate files
-            GAF.MakeMoltemplateFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
+            #Move files from master Dir
+            GAF.copy_files(FilesDir, CurDir)
 
             # Make LAMMPS files
-            GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000, Run=Foldername)
-            GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000, Run=Foldername)            
+            os.chdir(CurDir)
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
 
-            if PYTHONPATH == 'python3':
-                GAF.runcmd(f'packmol < {Name}.inp')
-                GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')
-
-                # Check that Moltemplate has generated all necessary files 
-                assert os.path.exists(join(CWD, f'{Name}_system.in.settings')), 'Settings file not generated'                 
-                assert os.path.exists(join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
-                assert os.path.exists(join(CWD, f'{Name}_system.data')), 'Data file not generated'         
-
-            RunNum +=1
+            RunNum +=1 
 
         except Exception as E:
             print(E)
             traceback.print_exc()
             pass
+
 
 ### Run MD simulations 
 Generation = 1
@@ -386,10 +348,6 @@ GenDirectory = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # List of simulation directories
 directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Run') 
 
-os.chdir(join(os.getcwd(), 'Molecules', 'Generation_1'))
-for MolID in MOLIDList:
-    GAF.runcmd(f'mkdir {MolID}')
-
 Num = 1
 for RunDir in directories_with_generation:
     try:
@@ -401,6 +359,8 @@ for RunDir in directories_with_generation:
         GAF.move_directory(source_directory, destination_directory)
         Num +=1
     except Exception as E:
+        print(E)
+        traceback.print_exc()
         pass
 
 GAF.runcmd('rm -r Run*')
@@ -538,8 +498,6 @@ for generation in range(2, MaxGenerations + 1):
             Parent1 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
             Parent2 = GAF.KTournament(ScoreSortedMolecules[:NumElite])[0]
 
-            print(Parent1, Parent2)
-
             # Attempt crossover
             try:
                 result = GAF.Mol_Crossover(Chem.MolFromSmiles(Parent1), Chem.MolFromSmiles(Parent2))
@@ -600,9 +558,9 @@ for generation in range(2, MaxGenerations + 1):
 
                     # Set feature definition file path to OPLS or LOPLS depending on user choice 
                     if LOPLS:
-                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -l -c"
+                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -l -c"
                     else:
-                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi {MutMolSMILES} -n {Name} -c"
+                        LTCOMMAND = f"{join(os.getcwd(), 'rdlt.py')} --smi '{MutMolSMILES}' -n {Name} -c"
                     
                     #Attempt to parameterise with OPLS
                     GAF.runcmd(f'{PYTHONPATH} {LTCOMMAND} > {STARTINGDIR}/{Name}.lt')
@@ -676,19 +634,10 @@ for generation in range(2, MaxGenerations + 1):
                     traceback.print_exc()
                     continue   
 
-    ### Delete test directories
-    os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
-
-    for dir in os.listdir(os.getcwd()):
-        try:
-            shutil.rmtree(dir)
-        except NotADirectoryError:
-            pass
-
     #### Create duplicate trajectories for each molecule
 
     RunNum = 1
-    for MolParam in GenSimList:
+    for MolParam in FirstGenSimList:
         Name = MolParam[0]
         MutMolSMILES = MolParam[1]
         BoxL = MolParam[2]
@@ -699,52 +648,24 @@ for generation in range(2, MaxGenerations + 1):
             try:
                 # Go into directory for this generation
                 os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
-                
+
                 Foldername = f'Run_{RunNum}'
 
                 # Make a directory for the current molecule if it can be parameterised 
                 GAF.runcmd(f'mkdir {Foldername}')
 
-                # Enter molecule specific directory
-                os.chdir(join(os.getcwd(), Foldername))
+                FilesDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Name}')
+                CurDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Foldername}')
 
-                #Check if file has already been made, skip if so, being sure not to make duplicate, otherwise move file to correct directory
-                CWD = os.getcwd() #Need to declare otherwise will get CWD from location function is being called from
-
-                #Copy molecule pdb to molecule directory
-                PDBFile = join(STARTINGDIR, f'{Name}.pdb')
-                GAF.runcmd(f'{CopyCommand} "{PDBFile}" {join(CWD, f"{Name}.pdb")}')
-                
-                #Copy molecule lt file to molecule directory
-                LTFile = join(STARTINGDIR, f'{Name}.lt')
-                GAF.runcmd(f'{CopyCommand} "{LTFile}" {join(CWD, f"{Name}.lt")}')
-
-                #Get estimate for Number of molecules 
-                NumMols = int(NumAtoms/HMutMol.GetNumAtoms()) # Maybe add field seeing how many mols were added to box
-
-                # Estimate starting box length
-                BoxL = GAF.CalcBoxLen(MolMass=MolMass, TargetDens=0.8, NumMols=NumMols)
-
-                # Make packmol files
-                GAF.MakePackmolFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
-
-                # Make Moltemplate files
-                GAF.MakeMoltemplateFile(Name, CWD, NumMols=NumMols, BoxL=BoxL)
+                #Move files from master Dir
+                GAF.copy_files(FilesDir, CurDir)
 
                 # Make LAMMPS files
-                GAF.MakeLAMMPSFile(Name, CWD, Temp=313, GKRuntime=1500000, Run=Foldername)
-                GAF.MakeLAMMPSFile(Name, CWD, Temp=373, GKRuntime=1500000, Run=Foldername)            
+                os.chdir(CurDir)
+                GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
+                GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
 
-                if PYTHONPATH == 'python3':
-                    GAF.runcmd(f'packmol < {Name}.inp')
-                    GAF.runcmd(f'moltemplate.sh -pdb {Name}_PackmolFile.pdb {Name}_system.lt')
-
-                    # Check that Moltemplate has generated all necessary files 
-                    assert os.path.exists(join(CWD, f'{Name}_system.in.settings')), 'Settings file not generated'                 
-                    assert os.path.exists(join(CWD, f'{Name}_system.in.charges')), 'Charges file not generated'
-                    assert os.path.exists(join(CWD, f'{Name}_system.data')), 'Data file not generated'         
-
-                RunNum +=1
+                RunNum +=1 
 
             except Exception as E:
                 print(E)
@@ -813,10 +734,6 @@ for generation in range(2, MaxGenerations + 1):
 
     # List of simulation directories
     directories_with_generation = GAF.list_generation_directories(GenDirectory, 'Run') 
-
-    os.chdir(join(os.getcwd(), 'Molecules', f'Generation_{generation}'))
-    for MolID in MOLIDList:
-        GAF.runcmd(f'mkdir {MolID}')
 
     Num = 1
     for RunDir in directories_with_generation:

@@ -14,7 +14,7 @@ import pandas as pd
 import re
 from math import log10
 import os
-from gt4sd.properties import PropertyPredictorRegistry
+# from gt4sd.properties import PropertyPredictorRegistry
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
@@ -1523,7 +1523,7 @@ class SCScorer():
         self.score_scale = score_scale
         self._restored = False
 
-    def restore(self, weight_path=os.path.join('C:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/full_reaxys_model_1024bool'), FP_rad=FP_rad, FP_len=FP_len):
+    def restore(self, weight_path=os.path.join('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/full_reaxys_model_1024bool'), FP_rad=FP_rad, FP_len=FP_len):
         self.FP_len = FP_len; self.FP_rad = FP_rad
         self._load_vars(weight_path)
         # print('Restored variables from {}'.format(weight_path))
@@ -1604,7 +1604,7 @@ class SCScorer():
 
 def SCScore(MolSMILES, WeightPath=None):
     model = SCScorer()
-    model.restore(os.path.join('C:/Users/eeo21/VSCodeProjects/GNN_Viscosity_Prediction/full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.json.gz'))
+    model.restore(os.path.join('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/GNN_Viscosity_Prediction/full_reaxys_model_1024bool', 'model.ckpt-10654.as_numpy.json.gz'))
     (smi, sco) = model.get_score_from_smi(MolSMILES)
     return sco
 
@@ -1905,6 +1905,7 @@ def find_files_with_extension(directory, extension):
     return matches
 
 def extract_molecule_name(file_path):
+    
     # Define the regex pattern to match 'Generation_X_Molecule_Y'
     pattern = r"Generation_\d+_Molecule_\d+"
     
@@ -1916,3 +1917,37 @@ def extract_molecule_name(file_path):
         return match.group(0)
     else:
         return None
+    
+def move_files(src_dir, dest_dir):
+    # Ensure destination directory exists
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+    
+    # List all files in source directory
+    files = os.listdir(src_dir)
+    
+    # Move each file to the destination directory
+    for file in files:
+        src_path = os.path.join(src_dir, file)
+        dest_path = os.path.join(dest_dir, file)
+        
+        # Move the file
+        shutil.move(src_path, dest_path)
+        print(f"Moved: {file}")
+
+def copy_files(src_dir, dest_dir):
+    # Ensure destination directory exists
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+    
+    # List all files in source directory
+    files = os.listdir(src_dir)
+    
+    # Copy each file to the destination directory
+    for file in files:
+        src_path = os.path.join(src_dir, file)
+        dest_path = os.path.join(dest_dir, file)
+        
+        # Copy the file
+        shutil.copy2(src_path, dest_path)
+        print(f"Copied: {file}")
