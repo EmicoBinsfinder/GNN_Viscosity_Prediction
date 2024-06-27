@@ -266,25 +266,25 @@ for MolParam in FirstGenSimList:
 
             # Make a directory for the current molecule if it can be parameterised 
             GAF.runcmd(f'mkdir {Foldername}')
+            RunNum +=1 
 
             FilesDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Name}')
             CurDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Foldername}')
+            SettingsFilePath = join(STARTINGDIR, 'settings.txt')
 
             #Move files from master Dir
-            GAF.copy_files(FilesDir, CurDir)
+            GAF.runcmd(f'cp -r {FilesDir}/* {CurDir}')
+            GAF.runcmd(f'cp  {SettingsFilePath} {CurDir}')
 
             # Make LAMMPS files
             os.chdir(CurDir)
-            GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
-            GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
-
-            RunNum +=1 
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1000000, Run=Foldername)
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1000000, Run=Foldername)
 
         except Exception as E:
             print(E)
             traceback.print_exc()
             pass
-
 
 ### Run MD simulations 
 Generation = 1
@@ -374,26 +374,36 @@ for Molecule, MOLSMILES, _, _ in FirstGenSimList:
         os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', Molecule))
         CWD = os.getcwd()
 
+        print('Getting Similarity Scores')
         ### Similarity Scores
         Scores = GAF.TanimotoSimilarity(MOLSMILES, MOLSMILESList)
         AvScore = 1 - (sum(Scores) / GenerationSize) # The higher the score, the less similar the molecule is to others
 
+        print('Getting SCScore')
         ### SCScore
         SCScore = GAF.SCScore(MOLSMILES)
         SCScoreNorm = SCScore/5
 
         ### Toxicity
+        print('Getting Toxicity')
         ToxNorm = GAF.Toxicity(MOLSMILES)
 
-        DensityFile40 = f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out'
-        DensityFile100 = f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out'
 
+        print('Getting Density')
+        DirRuns = GAF.list_generation_directories(CWD, 'Run')
+        ExampleRun = DirRuns[0]
+
+        DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
+        DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+
+        print('Getting Viscosity')
         ### Viscosity
-        DVisc40 = GAF.GetVisc(STARTINGDIR, Molecule, 313)
-        DVisc100 = GAF.GetVisc(STARTINGDIR, Molecule, 373)
+        DVisc40 = GAF.GetVisc(CWD, Molecule, 313)
+        DVisc100 = GAF.GetVisc(CWD, Molecule, 373)
         Dens40 = GAF.GetDens(DensityFile40)
         Dens100 = GAF.GetDens(DensityFile100)
 
+        print('Getting VI')
         ## Viscosity Index
         KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
         DVI = GAF.GetDVI(DVisc40, DVisc100)
@@ -637,7 +647,7 @@ for generation in range(2, MaxGenerations + 1):
     #### Create duplicate trajectories for each molecule
 
     RunNum = 1
-    for MolParam in FirstGenSimList:
+    for MolParam in GenSimList:
         Name = MolParam[0]
         MutMolSMILES = MolParam[1]
         BoxL = MolParam[2]
@@ -650,22 +660,25 @@ for generation in range(2, MaxGenerations + 1):
                 os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
 
                 Foldername = f'Run_{RunNum}'
+                RunNum +=1 
 
                 # Make a directory for the current molecule if it can be parameterised 
                 GAF.runcmd(f'mkdir {Foldername}')
+                RunNum +=1 
 
-                FilesDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Name}')
-                CurDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Foldername}')
+                FilesDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Name}')
+                CurDir = join(STARTINGDIR, 'Molecules', 'Generation_1', f'{Foldername}')
+                SettingsFilePath = join(STARTINGDIR, 'settings.txt')
 
                 #Move files from master Dir
-                GAF.copy_files(FilesDir, CurDir)
+                GAF.runcmd(f'cp -r {FilesDir}/* {CurDir}')
+                GAF.runcmd(f'cp  {SettingsFilePath} {CurDir}')
 
                 # Make LAMMPS files
                 os.chdir(CurDir)
                 GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
                 GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
 
-                RunNum +=1 
 
             except Exception as E:
                 print(E)
@@ -758,26 +771,36 @@ for generation in range(2, MaxGenerations + 1):
             os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}', Molecule))
             CWD = os.getcwd()
 
+            print('Getting Similarity Scores')
             ### Similarity Scores
             Scores = GAF.TanimotoSimilarity(MOLSMILES, MOLSMILESList)
             AvScore = 1 - (sum(Scores) / GenerationSize) # The higher the score, the less similar the molecule is to others
 
+            print('Getting SCScore')
             ### SCScore
             SCScore = GAF.SCScore(MOLSMILES)
             SCScoreNorm = SCScore/5
 
             ### Toxicity
+            print('Getting Toxicity')
             ToxNorm = GAF.Toxicity(MOLSMILES)
 
-            DensityFile40 = f'{CWD}/eqmDensity_{Molecule}_T313KP1atm.out'
-            DensityFile100 = f'{CWD}/eqmDensity_{Molecule}_T373KP1atm.out'
 
+            print('Getting Density')
+            DirRuns = GAF.list_generation_directories(CWD, 'Run')
+            ExampleRun = DirRuns[0]
+
+            DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
+            DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+
+            print('Getting Viscosity')
             ### Viscosity
-            DVisc40 = GAF.GetVisc(STARTINGDIR, Molecule, 313)
-            DVisc100 = GAF.GetVisc(STARTINGDIR, Molecule, 373)
+            DVisc40 = GAF.GetVisc(CWD, Molecule, 313)
+            DVisc100 = GAF.GetVisc(CWD, Molecule, 373)
             Dens40 = GAF.GetDens(DensityFile40)
             Dens100 = GAF.GetDens(DensityFile100)
 
+            print('Getting VI')
             ## Viscosity Index
             KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
             DVI = GAF.GetDVI(DVisc40, DVisc100)
