@@ -130,6 +130,7 @@ GAF.runcmd(f'mkdir Molecules')
 os.chdir(join(os.getcwd(), 'Molecules'))
 GAF.runcmd(f'mkdir Generation_1')
 os.chdir(STARTINGDIR)
+Generation = 1
 
 # Master Dataframe where molecules from all generations will be stored
 MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
@@ -247,6 +248,9 @@ while len(MoleculeDatabase) < GenerationSize:
             continue     
     FirstGenerationAttempts += 1
 
+MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
+GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation_{Generation}_Database.csv')
+
 #### Create duplicate trajectories for each molecule
 
 RunNum = 1
@@ -278,8 +282,8 @@ for MolParam in FirstGenSimList:
 
             # Make LAMMPS files
             os.chdir(CurDir)
-            GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1000000, Run=Foldername)
-            GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1000000, Run=Foldername)
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1250000, Run=Foldername)
+            GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1250000, Run=Foldername)
 
         except Exception as E:
             print(E)
@@ -287,7 +291,6 @@ for MolParam in FirstGenSimList:
             pass
 
 ### Run MD simulations 
-Generation = 1
 CWD = join(STARTINGDIR, 'Molecules', f'Generation_{Generation}')
 # Create and run array job for 40C viscosity
 GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=1, SimName='313K.lammps', Agent=Agent, GenerationSize=GenerationSize, NumElite=NumElite)
@@ -388,7 +391,6 @@ for Molecule, MOLSMILES, _, _ in FirstGenSimList:
         print('Getting Toxicity')
         ToxNorm = GAF.Toxicity(MOLSMILES)
 
-
         print('Getting Density')
         DirRuns = GAF.list_generation_directories(CWD, 'Run')
         ExampleRun = DirRuns[0]
@@ -398,10 +400,11 @@ for Molecule, MOLSMILES, _, _ in FirstGenSimList:
 
         print('Getting Viscosity')
         ### Viscosity
-        DVisc40 = GAF.GetVisc(CWD, Molecule, 313)
-        DVisc100 = GAF.GetVisc(CWD, Molecule, 373)
+        DVisc40 = GAF.GetVisc(join(STARTINGDIR, 'Molecules', f'Generation_{Generation}'), Molecule, 313)
+        DVisc100 = GAF.GetVisc(join(STARTINGDIR, 'Molecules', f'Generation_{Generation}'), Molecule, 373)
         Dens40 = GAF.GetDens(DensityFile40)
         Dens100 = GAF.GetDens(DensityFile100)
+        print(DVisc40, DVisc100)
 
         print('Getting VI')
         ## Viscosity Index
@@ -469,6 +472,9 @@ for entry in ScoreSortedMolecules:
 
 #Save the update Master database and generation database
 MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
+GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation_{Generation}_Database.csv')
+
+sys.exit()
 
 ################################## Subsequent generations #################################################
 for generation in range(2, MaxGenerations + 1):
@@ -676,8 +682,8 @@ for generation in range(2, MaxGenerations + 1):
 
                 # Make LAMMPS files
                 os.chdir(CurDir)
-                GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
-                GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
+                GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=12500000, Run=Foldername)
+                GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1250000, Run=Foldername)
 
 
             except Exception as E:
@@ -785,7 +791,6 @@ for generation in range(2, MaxGenerations + 1):
             print('Getting Toxicity')
             ToxNorm = GAF.Toxicity(MOLSMILES)
 
-
             print('Getting Density')
             DirRuns = GAF.list_generation_directories(CWD, 'Run')
             ExampleRun = DirRuns[0]
@@ -864,6 +869,7 @@ for generation in range(2, MaxGenerations + 1):
         entry.insert(4, MoleculeDatabase.loc[Key]['SMILES'])
 
     MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
+    GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation_{generation}_Database.csv')
 
 print(len(GenerationMoleculeList))
 print(f'Number of failed mutations: {Fails}')

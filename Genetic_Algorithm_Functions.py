@@ -1222,7 +1222,6 @@ fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(
 					append thermoNVE_{Name}_T${{T}}FP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
 run             	125000
 unfix           	NVE
-unfix 				thermostat
 unfix               thermo_print
 
 # Green-Kubo method via fix ave/correlate
