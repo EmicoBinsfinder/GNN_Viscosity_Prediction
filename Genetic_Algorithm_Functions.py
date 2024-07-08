@@ -1190,7 +1190,7 @@ thermo				$d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
 					append thermoNPT_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-run					500000
+run					800000
 unfix				NPT
 unfix               thermo_print
 write_restart  		NPT_{Name}_T${{T}}KP1atm.restart
@@ -1205,7 +1205,7 @@ thermo         		$d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
 					append thermoNVT_{Name}_T${{T}}KP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-run					250000
+run					300000
 unfix				NVT
 unfix           	adjust
 unfix               thermo_print
@@ -1220,7 +1220,7 @@ thermo          	$d
 thermo_style 		custom step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol
 fix 				thermo_print all print $d "$(step) $(temp) $(press) $(density) $(pxx) $(pyy) $(pzz) $(pxy) $(pxz) $(pyz) $(pe) $(ke) $(etotal) $(evdwl) $(ecoul) $(epair) $(ebond) $(eangle) $(edihed) $(eimp) $(emol) $(etail) $(enthalpy) $(vol)" &
 					append thermoNVE_{Name}_T${{T}}FP1atm.out screen no title "# step temp press density pxx pyy pzz pxy pxz pyz pe ke etotal evdwl ecoul epair ebond eangle edihed eimp emol etail enthalpy vol"
-run             	125000
+run             	250000
 unfix           	NVE
 unfix               thermo_print
 
@@ -1791,7 +1791,7 @@ def GetVisc(STARTDIR, Molecule, Temp):
             end_step = steps * timestep
             Time = np.linspace(0, end_step, num=steps, endpoint=False)
 
-            viscosity = einstein(timestep, Pxx, Pyy, Pzz, Pxy, Pxz, Pyz, volume, kBT, Time)
+            viscosity = einstein(timestep, Pxy, Pxz, Pyz, volume, kBT, Time)
 
             # Save the running integral of viscosity as a csv file
             df = pd.DataFrame({"time(ps)" : Time[:viscosity.shape[0]:each], "viscosity(Pa.s)" : viscosity[::each]})
@@ -1801,7 +1801,7 @@ def GetVisc(STARTDIR, Molecule, Temp):
             Time = np.linspace(0, end_step, num=steps, endpoint=False)
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             # Viscosity from Green-Kubo relation
-            avg_acf, viscosity = green_kubo(timestep)
+            avg_acf, viscosity = green_kubo(timestep, Pxy, Pxz, Pyz, volume, kBT)
 
             DataframeGK[f'Viscosity_{Run}'] = viscosity[:]*1000
 
