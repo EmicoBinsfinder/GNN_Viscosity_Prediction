@@ -180,17 +180,32 @@ for Molecule, MOLSMILES in GenSimList:
 
         #Update Molecule Database
         IDNumber = int(Molecule.split('_')[-1])
-        MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
-        MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
-        MoleculeDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
-        MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-        MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-        MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-        MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
-        MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
-        MoleculeDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
-        MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
-        MoleculeDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
+        MasterIDNumber = 50 + (int(generation) * 25) + IDNumber
+        MoleculeDatabase.at[MasterIDNumber, 'Density100C'] = Dens100
+        MoleculeDatabase.at[MasterIDNumber, 'Density40C'] = Dens40
+        MoleculeDatabase.at[MasterIDNumber, 'DViscosity40C'] = DVisc40
+        MoleculeDatabase.at[MasterIDNumber, 'DViscosity100C'] = DVisc100
+        MoleculeDatabase.at[MasterIDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+        MoleculeDatabase.at[MasterIDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+        MoleculeDatabase.at[MasterIDNumber, 'KVI'] = KVI
+        MoleculeDatabase.at[MasterIDNumber, 'DVI'] = DVI
+        MoleculeDatabase.at[MasterIDNumber, 'Toxicity'] = ToxNorm
+        MoleculeDatabase.at[MasterIDNumber, 'SCScore'] = SCScoreNorm
+        MoleculeDatabase.at[MasterIDNumber, 'SimilarityScore'] = SCScoreNorm
+
+        #Update Generation Database
+        IDNumber = int(Molecule.split('_')[-1])
+        GenerationDatabase.at[IDNumber, 'Density100C'] = Dens100
+        GenerationDatabase.at[IDNumber, 'Density40C'] = Dens40
+        GenerationDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
+        GenerationDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
+        GenerationDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+        GenerationDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+        GenerationDatabase.at[IDNumber, 'KVI'] = KVI
+        GenerationDatabase.at[IDNumber, 'DVI'] = DVI
+        GenerationDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
+        GenerationDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
+        GenerationDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
 
     except Exception as E:
         print(E)
@@ -223,6 +238,12 @@ MoleculeDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
 MoleculeDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
 MoleculeDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
 
+# Update Generation Database
+# GenerationDatabase['ViscNormalisedScore'] = Viscosity_normalized_molecule_scores
+# GenerationDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
+# GenerationDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
+# GenerationDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
+
 #Make a pandas object with just the scores and the molecule ID
 GenerationMolecules = pd.Series(MoleculeDatabase.NichedScore.values, index=MoleculeDatabase.ID)
 
@@ -244,7 +265,7 @@ for entry in ScoreSortedMolecules:
 
 #Save the update Master database and generation database
 MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv', index=False)
-GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation{generation}Database.csv', index=False)
+MoleculeDatabase.to_csv(f'{STARTINGDIR}/Generation{generation}Database.csv', index=False)
 generation_Initial = int(generation)
 generation_Initial +=1
 
@@ -295,7 +316,14 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                 continue
 
             # List containing last two successful mutations performed on molecule
-            PreviousMutations = ast.literal_eval(entry[2])
+            try:
+                PreviousMutations = ast.literal_eval(entry[2])
+            except:
+                try:
+                    PreviousMutations = entry[2]
+                except:
+                    pass
+                
             # Number of heavy atoms
             NumHeavyAtoms = entry[3]
             # Molecule ID
@@ -448,7 +476,6 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
                 # Make a directory for the current molecule if it can be parameterised 
                 GAF.runcmd(f'mkdir {Foldername}')
-                RunNum +=1 
 
                 FilesDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Name}')
                 CurDir = join(STARTINGDIR, 'Molecules', f'Generation_{generation}', f'{Foldername}')
@@ -592,17 +619,32 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
             #Update Molecule Database
             IDNumber = int(Molecule.split('_')[-1])
-            MoleculeDatabase.at[IDNumber, 'Density100C'] = Dens100
-            MoleculeDatabase.at[IDNumber, 'Density40C'] = Dens40
-            MoleculeDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
-            MoleculeDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-            MoleculeDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-            MoleculeDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-            MoleculeDatabase.at[IDNumber, 'KVI'] = KVI
-            MoleculeDatabase.at[IDNumber, 'DVI'] = DVI
-            MoleculeDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
-            MoleculeDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
-            MoleculeDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
+            MasterIDNumber = 50 + (int(generation) * 25) + IDNumber
+            MoleculeDatabase.at[MasterIDNumber, 'Density100C'] = Dens100
+            MoleculeDatabase.at[MasterIDNumber, 'Density40C'] = Dens40
+            MoleculeDatabase.at[MasterIDNumber, 'DViscosity40C'] = DVisc40
+            MoleculeDatabase.at[MasterIDNumber, 'DViscosity100C'] = DVisc100
+            MoleculeDatabase.at[MasterIDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            MoleculeDatabase.at[MasterIDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            MoleculeDatabase.at[MasterIDNumber, 'KVI'] = KVI
+            MoleculeDatabase.at[MasterIDNumber, 'DVI'] = DVI
+            MoleculeDatabase.at[MasterIDNumber, 'Toxicity'] = ToxNorm
+            MoleculeDatabase.at[MasterIDNumber, 'SCScore'] = SCScoreNorm
+            MoleculeDatabase.at[MasterIDNumber, 'SimilarityScore'] = SCScoreNorm
+
+            #Update Generation Database
+            IDNumber = int(Molecule.split('_')[-1])
+            GenerationDatabase.at[IDNumber, 'Density100C'] = Dens100
+            GenerationDatabase.at[IDNumber, 'Density40C'] = Dens40
+            GenerationDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
+            GenerationDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
+            GenerationDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            GenerationDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            GenerationDatabase.at[IDNumber, 'KVI'] = KVI
+            GenerationDatabase.at[IDNumber, 'DVI'] = DVI
+            GenerationDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
+            GenerationDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
+            GenerationDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
 
         except Exception as E:
             print(E)
