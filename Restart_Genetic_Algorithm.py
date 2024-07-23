@@ -55,6 +55,7 @@ NumAtoms = 10000
 Agent = 'Agent1'
 STARTINGDIR = deepcopy(os.getcwd())
 PYTHONPATH = 'python3'
+generation = 1
 
 ### BOND TYPES
 BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
@@ -68,22 +69,6 @@ AtomicNumbers = []
 for Object in AtomMolObjects:
      for atom in Object.GetAtoms():
           AtomicNumbers.append(atom.GetAtomicNum())   
-
-############### Restart GA ######################
-
-#Load in progress from master Database
-MoleculeDatabase = pd.read_csv('MoleculeDatabase.csv', index_col=False)
-
-# Calculate Generation Number
-FullMOLIDList = MoleculeDatabase['ID'].to_list()
-
-generation = FullMOLIDList[-1].split('_')[1]
-GenerationDatabase = pd.read_csv(f'{STARTINGDIR}/Generation{generation}Database.csv', index_col=False)
-
-MOLIDList = GenerationDatabase['ID'].to_list()
-print(MOLIDList)
-
-MoleculeDatabase.index += 1
 
 ### Wait until array jobs have finished
 MoveOn = False
@@ -132,14 +117,36 @@ for RunDir in directories_with_generation:
 
 GAF.runcmd('rm -r Run*')
 
+# Get PDBs from directories
+MOLSMILESList = []
+
+MOLIDList = GAF.list_generation_directories(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'), 'Molecule')
+print(MOLIDList)
+
+for MoleculeDir in MOLIDList:
+    Path = join(STARTINGDIR, 'Molecules',  f'Generation_{generation}', MoleculeDir, f'{MoleculeDir}.pdb')
+    print(Path)
+    MolObject = Chem.MolFromPDBFile(Path)
+    SMILES = Chem.MolToSmiles(MolObject)
+    MOLSMILESList.append(SMILES)
+
+print(MOLSMILESList)
+
+# Master Dataframe where molecules from all generations will be stored
+MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
+                                        'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
+
+# Generation Dataframe to store molecules from each generation
+GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
+                                        'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
+
 # Here is where we will get the various values generated from the MD simulations
-MOLSMILESList = GenerationDatabase['SMILES']
+
 GenSimList = list(zip(MOLIDList, MOLSMILESList))
 
 print(GenSimList)
 
 for Molecule, MOLSMILES in GenSimList:
-    print(Molecule)
     try:
         # Create a function to wait until all simulations from this generation are finished
         os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}', Molecule))
@@ -156,56 +163,55 @@ for Molecule, MOLSMILES in GenSimList:
         SCScoreNorm = SCScore/5
 
         ### Toxicity
-        print('Getting Toxicity')
         ToxNorm = GAF.Toxicity(MOLSMILES)
 
-        print('Getting Density')
         DirRuns = GAF.list_generation_directories(CWD, 'Run')
         ExampleRun = DirRuns[0]
 
         DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
         DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
 
-        print('Getting Viscosity')
         ### Viscosity
         DVisc40 = GAF.GetVisc(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'), Molecule, 313)
         DVisc100 = GAF.GetVisc(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'), Molecule, 373)
         Dens40 = GAF.GetDens(DensityFile40)
         Dens100 = GAF.GetDens(DensityFile100)
 
-        print('Getting VI')
         ## Viscosity Index
         KVI = GAF.GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR)
         DVI = GAF.GetDVI(DVisc40, DVisc100)
 
         #Update Molecule Database
         IDNumber = int(Molecule.split('_')[-1])
-        MasterIDNumber = 50 + (int(generation) * 25) + IDNumber
-        MoleculeDatabase.at[MasterIDNumber, 'Density100C'] = Dens100
-        MoleculeDatabase.at[MasterIDNumber, 'Density40C'] = Dens40
-        MoleculeDatabase.at[MasterIDNumber, 'DViscosity40C'] = DVisc40
-        MoleculeDatabase.at[MasterIDNumber, 'DViscosity100C'] = DVisc100
-        MoleculeDatabase.at[MasterIDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-        MoleculeDatabase.at[MasterIDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-        MoleculeDatabase.at[MasterIDNumber, 'KVI'] = KVI
-        MoleculeDatabase.at[MasterIDNumber, 'DVI'] = DVI
-        MoleculeDatabase.at[MasterIDNumber, 'Toxicity'] = ToxNorm
-        MoleculeDatabase.at[MasterIDNumber, 'SCScore'] = SCScoreNorm
-        MoleculeDatabase.at[MasterIDNumber, 'SimilarityScore'] = SCScoreNorm
+        MoleculeDatabase.at[IDNumber - 1, 'SMILES'] = MOLSMILES
+        MoleculeDatabase.at[IDNumber - 1, 'ID'] = Molecule
+        MoleculeDatabase.at[IDNumber - 1, 'Density100C'] = Dens100
+        MoleculeDatabase.at[IDNumber - 1, 'Density40C'] = Dens40
+        MoleculeDatabase.at[IDNumber - 1, 'DViscosity40C'] = DVisc40
+        MoleculeDatabase.at[IDNumber - 1, 'DViscosity100C'] = DVisc100
+        MoleculeDatabase.at[IDNumber - 1, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+        MoleculeDatabase.at[IDNumber - 1, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+        MoleculeDatabase.at[IDNumber - 1, 'KVI'] = KVI
+        MoleculeDatabase.at[IDNumber - 1, 'DVI'] = DVI
+        MoleculeDatabase.at[IDNumber - 1, 'Toxicity'] = ToxNorm
+        MoleculeDatabase.at[IDNumber - 1, 'SCScore'] = SCScoreNorm
+        MoleculeDatabase.at[IDNumber - 1, 'SimilarityScore'] = SCScoreNorm
 
         #Update Generation Database
+        GenerationDatabase.at[IDNumber - 1, 'SMILES'] = MOLSMILES
+        GenerationDatabase.at[IDNumber - 1, 'ID'] = Molecule
         IDNumber = int(Molecule.split('_')[-1])
-        GenerationDatabase.at[IDNumber, 'Density100C'] = Dens100
-        GenerationDatabase.at[IDNumber, 'Density40C'] = Dens40
-        GenerationDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
-        GenerationDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-        GenerationDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-        GenerationDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-        GenerationDatabase.at[IDNumber, 'KVI'] = KVI
-        GenerationDatabase.at[IDNumber, 'DVI'] = DVI
-        GenerationDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
-        GenerationDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
-        GenerationDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
+        GenerationDatabase.at[IDNumber - 1, 'Density100C'] = Dens100
+        GenerationDatabase.at[IDNumber - 1, 'Density40C'] = Dens40
+        GenerationDatabase.at[IDNumber - 1, 'DViscosity40C'] = DVisc40
+        GenerationDatabase.at[IDNumber - 1, 'DViscosity100C'] = DVisc100
+        GenerationDatabase.at[IDNumber - 1, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+        GenerationDatabase.at[IDNumber - 1, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+        GenerationDatabase.at[IDNumber - 1, 'KVI'] = KVI
+        GenerationDatabase.at[IDNumber - 1, 'DVI'] = DVI
+        GenerationDatabase.at[IDNumber - 1, 'Toxicity'] = ToxNorm
+        GenerationDatabase.at[IDNumber - 1, 'SCScore'] = SCScoreNorm
+        GenerationDatabase.at[IDNumber - 1, 'SimilarityScore'] = SCScoreNorm
 
     except Exception as E:
         print(E)
@@ -238,16 +244,15 @@ MoleculeDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
 MoleculeDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
 MoleculeDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
 
-# Update Generation Database
-# GenerationDatabase['ViscNormalisedScore'] = Viscosity_normalized_molecule_scores
-# GenerationDatabase['DVINormalisedScore'] = DVI_normalized_molecule_scores
-# GenerationDatabase['TotalScore'] = MoleculeDatabase['Toxicity'] + MoleculeDatabase['SCScore'] + MoleculeDatabase['DVINormalisedScore'] + MoleculeDatabase['ViscNormalisedScore'] 
-# GenerationDatabase['NichedScore'] = MoleculeDatabase['TotalScore'] / MoleculeDatabase['SimilarityScore']
+print(MoleculeDatabase)
 
 #Make a pandas object with just the scores and the molecule ID
-GenerationMolecules = pd.Series(MoleculeDatabase.NichedScore.values, index=MoleculeDatabase.ID)
+GenerationMolecules = pd.Series(MoleculeDatabase.NichedScore.values, index=MoleculeDatabase.ID).dropna()
+
+print(GenerationMolecules)
 
 GenerationMolecules = GenerationMolecules.to_dict()
+print(GenerationMolecules)
 
 # Sort dictiornary according to target score
 ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[1], reverse=True)
@@ -255,28 +260,40 @@ ScoreSortedMolecules = sorted(GenerationMolecules.items(), key=lambda item:item[
 #Convert tuple elements in sorted list back to lists 
 ScoreSortedMolecules = [list(x) for x in ScoreSortedMolecules]
 
+print(ScoreSortedMolecules)
+
 # Constructing entries for use in subsequent generation
 for entry in ScoreSortedMolecules:
-    Key = int(entry[0].split('_')[-1])
+    Key = int(entry[0].split('_')[-1]) - 1
     entry.insert(1, MoleculeDatabase.loc[Key]['MolObject'])
     entry.insert(2, MoleculeDatabase.loc[Key]['MutationList'])
     entry.insert(3, MoleculeDatabase.loc[Key]['HeavyAtoms'])
     entry.insert(4, MoleculeDatabase.loc[Key]['SMILES'])
+try:
+    MoleculeDatabase.drop("Unnamed: 0", axis=1, inplace=True) 
+except:
+    pass
 
 #Save the update Master database and generation database
-MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv', index=False)
-MoleculeDatabase.to_csv(f'{STARTINGDIR}/Generation{generation}Database.csv', index=False)
+MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase_Generation_{generation}.csv', index=False)
+MoleculeDatabase.to_csv(f'{STARTINGDIR}/Generation_{generation}_Database.csv', index=False)
 generation_Initial = int(generation)
 generation_Initial +=1
+
+print(len(ScoreSortedMolecules))
 
 ################################## Subsequent generations #################################################
 for generation in range(generation_Initial, MaxGenerations + 1):
     GenerationTotalAttempts = 0
     GenSimList = []
+    IDcounter = 1
 
     # Generation Dataframe to store molecules from each generation
     GenerationDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
                                             'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
+    
+    MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
+                                        'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
 
     os.chdir(STARTINGDIR)
     # Store x best performing molecules (x=NumElite in list for next generation, without mutating them)
@@ -369,8 +386,11 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                 MutMolSMILES = result[2] # SMILES of mutated molecule
 
                 # Update previous mutations object
-                PreviousMutations.pop(0)
-                PreviousMutations.append(Mutation)
+                try:
+                    PreviousMutations.pop(0)
+                    PreviousMutations.append(Mutation)
+                except:
+                    pass
 
                 print(f'Final SMILES: {result[2]}')
 
@@ -444,9 +464,17 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                     MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
                                             MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
                     
+                    GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
+                        MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
+                    
                     # Generate list of molecules to simulate in this generation
                     GenSimList.append([Name, MutMolSMILES, BoxL, NumMols])
-                    MasterMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
+
+                    if MutMolSMILES in MasterMoleculeList:
+                        continue
+                    else:
+                        MasterMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
+
                     GenerationMoleculeList.append(MutMolSMILES) #Keep track of already generated molecules
                     print(f'Final Molecule SMILES: {MutMolSMILES}') 
                     IDcounter += 1
@@ -459,6 +487,11 @@ for generation in range(generation_Initial, MaxGenerations + 1):
     #### Create duplicate trajectories for each molecule
 
     RunNum = 1
+
+    if len(GenSimList) != 25:
+        print(len(GenSimList))
+        break
+
     for MolParam in GenSimList:
         Name = MolParam[0]
         MutMolSMILES = MolParam[1]
@@ -490,7 +523,6 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                 GAF.MakeLAMMPSFile(Name, CurDir, Temp=313, GKRuntime=1500000, Run=Foldername)
                 GAF.MakeLAMMPSFile(Name, CurDir, Temp=373, GKRuntime=1500000, Run=Foldername)
 
-
             except Exception as E:
                 print(E)
                 traceback.print_exc()
@@ -498,6 +530,8 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
     #This is where we should call the simulation script
     CWD = join(STARTINGDIR, 'Molecules', f'Generation_{generation}')
+    os.chdir(CWD)
+
     # Create array job for 40C viscosity
     GAF.CreateArrayJob(STARTINGDIR, CWD, NumRuns, Generation=generation, SimName='313K.lammps', GenerationSize=GenerationSize, Agent=Agent, NumElite=NumElite)
     # Create array job for 100C viscosity
@@ -573,6 +607,7 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
     # Here is where we will get the various values generated from the MD simulations
     MOLSMILESList = GenerationDatabase['SMILES']
+    MOLIDList = GenerationDatabase['ID']
     GenSimList = list(zip(MOLIDList, MOLSMILESList))
 
     print(GenSimList)
@@ -619,32 +654,31 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
             #Update Molecule Database
             IDNumber = int(Molecule.split('_')[-1])
-            MasterIDNumber = 50 + (int(generation) * 25) + IDNumber
-            MoleculeDatabase.at[MasterIDNumber, 'Density100C'] = Dens100
-            MoleculeDatabase.at[MasterIDNumber, 'Density40C'] = Dens40
-            MoleculeDatabase.at[MasterIDNumber, 'DViscosity40C'] = DVisc40
-            MoleculeDatabase.at[MasterIDNumber, 'DViscosity100C'] = DVisc100
-            MoleculeDatabase.at[MasterIDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-            MoleculeDatabase.at[MasterIDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-            MoleculeDatabase.at[MasterIDNumber, 'KVI'] = KVI
-            MoleculeDatabase.at[MasterIDNumber, 'DVI'] = DVI
-            MoleculeDatabase.at[MasterIDNumber, 'Toxicity'] = ToxNorm
-            MoleculeDatabase.at[MasterIDNumber, 'SCScore'] = SCScoreNorm
-            MoleculeDatabase.at[MasterIDNumber, 'SimilarityScore'] = SCScoreNorm
+            MoleculeDatabase.at[IDNumber - 1, 'Density100C'] = Dens100
+            MoleculeDatabase.at[IDNumber - 1, 'Density40C'] = Dens40
+            MoleculeDatabase.at[IDNumber - 1, 'DViscosity40C'] = DVisc40
+            MoleculeDatabase.at[IDNumber - 1, 'DViscosity100C'] = DVisc100
+            MoleculeDatabase.at[IDNumber - 1, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            MoleculeDatabase.at[IDNumber - 1, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            MoleculeDatabase.at[IDNumber - 1, 'KVI'] = KVI
+            MoleculeDatabase.at[IDNumber - 1, 'DVI'] = DVI
+            MoleculeDatabase.at[IDNumber - 1, 'Toxicity'] = ToxNorm
+            MoleculeDatabase.at[IDNumber - 1, 'SCScore'] = SCScoreNorm
+            MoleculeDatabase.at[IDNumber - 1, 'SimilarityScore'] = SCScoreNorm
 
             #Update Generation Database
             IDNumber = int(Molecule.split('_')[-1])
-            GenerationDatabase.at[IDNumber, 'Density100C'] = Dens100
-            GenerationDatabase.at[IDNumber, 'Density40C'] = Dens40
-            GenerationDatabase.at[IDNumber, 'DViscosity40C'] = DVisc40
-            GenerationDatabase.at[IDNumber, 'DViscosity100C'] = DVisc100
-            GenerationDatabase.at[IDNumber, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
-            GenerationDatabase.at[IDNumber, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
-            GenerationDatabase.at[IDNumber, 'KVI'] = KVI
-            GenerationDatabase.at[IDNumber, 'DVI'] = DVI
-            GenerationDatabase.at[IDNumber, 'Toxicity'] = ToxNorm
-            GenerationDatabase.at[IDNumber, 'SCScore'] = SCScoreNorm
-            GenerationDatabase.at[IDNumber, 'SimilarityScore'] = SCScoreNorm
+            GenerationDatabase.at[IDNumber - 1, 'Density100C'] = Dens100
+            GenerationDatabase.at[IDNumber - 1, 'Density40C'] = Dens40
+            GenerationDatabase.at[IDNumber - 1, 'DViscosity40C'] = DVisc40
+            GenerationDatabase.at[IDNumber - 1, 'DViscosity100C'] = DVisc100
+            GenerationDatabase.at[IDNumber - 1, 'KViscosity40C'] = GAF.GetKVisc(DVisc=DVisc40, Dens=Dens40)
+            GenerationDatabase.at[IDNumber - 1, 'KViscosity100C'] = GAF.GetKVisc(DVisc=DVisc100, Dens=Dens100)
+            GenerationDatabase.at[IDNumber - 1, 'KVI'] = KVI
+            GenerationDatabase.at[IDNumber - 1, 'DVI'] = DVI
+            GenerationDatabase.at[IDNumber - 1, 'Toxicity'] = ToxNorm
+            GenerationDatabase.at[IDNumber - 1, 'SCScore'] = SCScoreNorm
+            GenerationDatabase.at[IDNumber - 1, 'SimilarityScore'] = SCScoreNorm
 
         except Exception as E:
             print(E)
@@ -690,12 +724,17 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
     # Constructing entries for use in subsequent generation
     for entry in ScoreSortedMolecules:
-        Key = int(entry[0].split('_')[-1])
+        Key = int(entry[0].split('_')[-1]) - 1
         entry.insert(1, MoleculeDatabase.loc[Key]['MolObject'])
         entry.insert(2, MoleculeDatabase.loc[Key]['MutationList'])
         entry.insert(3, MoleculeDatabase.loc[Key]['HeavyAtoms'])
         entry.insert(4, MoleculeDatabase.loc[Key]['SMILES'])
 
+    try:
+        MoleculeDatabase.drop("Unnamed: 0", axis=1, inplace=True) 
+    except:
+        pass
+
     #Save the update Master database and generation database
-    MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv', index=False)
-    GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation{generation}Database.csv')
+    MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase_Generation_{generation}.csv', index=False)
+    MoleculeDatabase.to_csv(f'{STARTINGDIR}/Generation_{generation}_Database.csv', index=False)

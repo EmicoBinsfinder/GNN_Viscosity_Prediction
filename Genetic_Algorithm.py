@@ -470,6 +470,8 @@ for entry in ScoreSortedMolecules:
     entry.insert(3, MoleculeDatabase.loc[Key]['HeavyAtoms'])
     entry.insert(4, MoleculeDatabase.loc[Key]['SMILES'])
 
+MoleculeDatabase.drop("Unnamed: 0", axis=1, inplace=True) 
+
 #Save the update Master database and generation database
 MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
 GenerationDatabase.to_csv(f'{STARTINGDIR}/Generation_{Generation}_Database.csv')
