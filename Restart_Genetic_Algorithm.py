@@ -55,7 +55,7 @@ NumAtoms = 10000
 Agent = 'Agent1'
 STARTINGDIR = deepcopy(os.getcwd())
 PYTHONPATH = 'python3'
-generation = 1
+generation = 2
 
 ### BOND TYPES
 BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
@@ -130,8 +130,6 @@ for MoleculeDir in MOLIDList:
     SMILES = Chem.MolToSmiles(MolObject)
     MOLSMILESList.append(SMILES)
 
-print(MOLSMILESList)
-
 # Master Dataframe where molecules from all generations will be stored
 MoleculeDatabase = pd.DataFrame(columns=['SMILES', 'MolObject', 'MutationList', 'HeavyAtoms', 'ID', 'Charge', 'MolMass', 'Predecessor', 'Score', 'Density100C', 'DViscosity40C',
                                         'DViscosity100C', 'KViscosity40C', 'KViscosity100C', 'KVI', 'DVI', 'Toxicity', 'SCScore', 'Density40C', 'SimilarityScore'])
@@ -168,8 +166,12 @@ for Molecule, MOLSMILES in GenSimList:
         DirRuns = GAF.list_generation_directories(CWD, 'Run')
         ExampleRun = DirRuns[0]
 
-        DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
-        DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+        for run in DirRuns:
+            try:
+                DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
+                DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+            except:
+                continue
 
         ### Viscosity
         DVisc40 = GAF.GetVisc(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'), Molecule, 313)
@@ -411,7 +413,10 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                     charge = GAF.GetMolCharge(f'{os.getcwd()}/{Name}.lt')
 
                     #If successful, generate a PDB of molecule to use with Packmol
-                    GAF.GeneratePDB(MutMolSMILES, PATH=join(STARTINGDIR, f'{Name}.pdb'))
+                    try:
+                        GAF.GeneratePDB(MutMolSMILES, PATH=join(STARTINGDIR, f'{Name}.pdb'))
+                    except:
+                        continue
 
                     # Go into directory for this generation
                     os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'))
