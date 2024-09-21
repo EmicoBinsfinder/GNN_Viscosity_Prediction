@@ -1460,6 +1460,9 @@ def GetKVI(DVisc40, DVisc100, Dens40, Dens100, STARTINGDIR):
     if KVisc100 == None:
         VI = 0
 
+    elif KVisc40 == None:
+        VI = 0
+
     elif KVisc100 >= 2:
         # Retrive L and H value
         RefVals['Diffs'] = abs(RefVals['KVI'] - KVisc100)

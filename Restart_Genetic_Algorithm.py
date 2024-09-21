@@ -55,7 +55,7 @@ NumAtoms = 10000
 Agent = 'Agent1'
 STARTINGDIR = deepcopy(os.getcwd())
 PYTHONPATH = 'python3'
-generation = 2
+generation = 3
 
 ### BOND TYPES
 BondTypes = [Chem.BondType.SINGLE, Chem.BondType.DOUBLE]
@@ -163,6 +163,7 @@ for Molecule, MOLSMILES in GenSimList:
         ### Toxicity
         ToxNorm = GAF.Toxicity(MOLSMILES)
 
+        print('Getting Density')
         DirRuns = GAF.list_generation_directories(CWD, 'Run')
         ExampleRun = DirRuns[0]
 
@@ -202,7 +203,6 @@ for Molecule, MOLSMILES in GenSimList:
         #Update Generation Database
         GenerationDatabase.at[IDNumber - 1, 'SMILES'] = MOLSMILES
         GenerationDatabase.at[IDNumber - 1, 'ID'] = Molecule
-        IDNumber = int(Molecule.split('_')[-1])
         GenerationDatabase.at[IDNumber - 1, 'Density100C'] = Dens100
         GenerationDatabase.at[IDNumber - 1, 'Density40C'] = Dens40
         GenerationDatabase.at[IDNumber - 1, 'DViscosity40C'] = DVisc40
@@ -304,8 +304,7 @@ for generation in range(generation_Initial, MaxGenerations + 1):
     GAF.runcmd(f'mkdir Generation_{generation}')
     os.chdir(STARTINGDIR)
 
-    for i, entry in enumerate(ScoreSortedMolecules): #Start by mutating best performing molecules from previous generation and work down
-        print(entry)
+    for x in list(range(0, 100)): #Start by mutating best performing molecules from previous generation and work down
         MutMol = None
         attempts = 0
 
@@ -334,17 +333,13 @@ for generation in range(generation_Initial, MaxGenerations + 1):
             except Exception as E:
                 continue
 
-            # List containing last two successful mutations performed on molecule
-            try:
-                PreviousMutations = ast.literal_eval(entry[2])
-            except:
-                try:
-                    PreviousMutations = entry[2]
-                except:
-                    pass
-                
             # Number of heavy atoms
-            NumHeavyAtoms = entry[3]
+            try:
+                print(result)
+                NumHeavyAtoms = result[0].GetNumHeavyAtoms()
+            except:
+                continue 
+            
             # Molecule ID
             Name = f'Generation_{generation}_Molecule_{IDcounter}'
 
@@ -386,13 +381,6 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                 MutMol = result[0] # Get Mol object of mutated molecule
                 MolMass = GAF.GetMolMass(MutMol) # Get estimate of of molecular mass 
                 MutMolSMILES = result[2] # SMILES of mutated molecule
-
-                # Update previous mutations object
-                try:
-                    PreviousMutations.pop(0)
-                    PreviousMutations.append(Mutation)
-                except:
-                    pass
 
                 print(f'Final SMILES: {result[2]}')
 
@@ -464,13 +452,12 @@ for generation in range(generation_Initial, MaxGenerations + 1):
 
                     # Return to starting directory
                     os.chdir(STARTINGDIR)
-
                     # Add candidate and it's data to master list
                     MoleculeDatabase = GAF.DataUpdate(MoleculeDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                                            MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
+                                            MutationList=Mutation, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
                     
                     GenerationDatabase = GAF.DataUpdate(GenerationDatabase, IDCounter=IDcounter, MutMolSMILES=MutMolSMILES, MutMol=MutMol, HeavyAtoms=HeavyAtoms,
-                        MutationList=PreviousMutations, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
+                        MutationList=Mutation, ID=Name, Charge=charge, MolMass=MolMass, Predecessor=[Parent1, Parent2])
                     
                     # Generate list of molecules to simulate in this generation
                     GenSimList.append([Name, MutMolSMILES, BoxL, NumMols])
@@ -487,6 +474,7 @@ for generation in range(generation_Initial, MaxGenerations + 1):
                 except Exception as E:
                     print(E)
                     traceback.print_exc()
+                    os.chdir(STARTINGDIR)
                     continue   
 
     #### Create duplicate trajectories for each molecule
@@ -494,6 +482,7 @@ for generation in range(generation_Initial, MaxGenerations + 1):
     RunNum = 1
 
     if len(GenSimList) != 25:
+        print(GenSimList)
         print(len(GenSimList))
         break
 
@@ -611,10 +600,20 @@ for generation in range(generation_Initial, MaxGenerations + 1):
     GAF.runcmd('rm -r Run*')
 
     # Here is where we will get the various values generated from the MD simulations
-    MOLSMILESList = GenerationDatabase['SMILES']
-    MOLIDList = GenerationDatabase['ID']
-    GenSimList = list(zip(MOLIDList, MOLSMILESList))
+    # Get PDBs from directories
+    MOLSMILESList = []
 
+    MOLIDList = GAF.list_generation_directories(join(STARTINGDIR, 'Molecules', f'Generation_{generation}'), 'Molecule')
+
+    for MoleculeDir in MOLIDList:
+        Path = join(STARTINGDIR, 'Molecules',  f'Generation_{generation}', MoleculeDir, f'{MoleculeDir}.pdb')
+        print(Path)
+        MolObject = Chem.MolFromPDBFile(Path)
+        SMILES = Chem.MolToSmiles(MolObject)
+        MOLSMILESList.append(SMILES)
+
+    # Here is where we will get the various values generated from the MD simulations
+    GenSimList = list(zip(MOLIDList, MOLSMILESList))
     print(GenSimList)
 
     for Molecule, MOLSMILES in GenSimList:
@@ -642,8 +641,12 @@ for generation in range(generation_Initial, MaxGenerations + 1):
             DirRuns = GAF.list_generation_directories(CWD, 'Run')
             ExampleRun = DirRuns[0]
 
-            DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
-            DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+            for run in DirRuns:
+                try:
+                    DensityFile40 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T313KP1atm.out'
+                    DensityFile100 = f'{CWD}/{ExampleRun}/eqmDensity_{Molecule}_T373KP1atm.out'
+                except:
+                    continue
 
             print('Getting Viscosity')
             ### Viscosity
