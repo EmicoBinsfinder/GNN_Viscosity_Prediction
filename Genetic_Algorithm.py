@@ -1,3 +1,4 @@
+
 """
 Author: Egheosa Ogbomo
 Date: 11/10/2023
@@ -116,7 +117,7 @@ MutationRate = 0.4
 showdiff = False # Whether or not to display illustration of each mutation
 GenerationSize = 50
 LOPLS = False # Whether or not to use OPLS or LOPLS, False uses OPLS
-MaxGenerations = 1000
+MaxGenerations = 100
 MaxMutationAttempts = 200
 Fails = 0
 NumRuns = 5
@@ -371,7 +372,7 @@ GAF.runcmd('rm -r Run*')
 # Here is where we will get the various values generated from the MD simulations
 MOLSMILESList = [x[1] for x in FirstGenSimList]
 
-for Molecule, MOLSMILES, _, _ in FirstGenSimList:
+for Molecule, MOLSMILES in FirstGenSimList:
     try:
         # Create a function to wait until all simulations from this generation are finished
         os.chdir(join(STARTINGDIR, 'Molecules', f'Generation_{Generation}', Molecule))
@@ -469,8 +470,6 @@ for entry in ScoreSortedMolecules:
     entry.insert(2, MoleculeDatabase.loc[Key]['MutationList'])
     entry.insert(3, MoleculeDatabase.loc[Key]['HeavyAtoms'])
     entry.insert(4, MoleculeDatabase.loc[Key]['SMILES'])
-
-MoleculeDatabase.drop("Unnamed: 0", axis=1, inplace=True) 
 
 #Save the update Master database and generation database
 MoleculeDatabase.to_csv(f'{STARTINGDIR}/MoleculeDatabase.csv')
@@ -876,3 +875,4 @@ for generation in range(2, MaxGenerations + 1):
 print(len(GenerationMoleculeList))
 print(f'Number of failed mutations: {Fails}')
 print(len(ScoreSortedMolecules[:NumElite]))
+

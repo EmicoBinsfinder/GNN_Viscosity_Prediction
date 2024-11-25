@@ -6,7 +6,6 @@ from rdkit.Chem import AllChem
 from rdkit.Chem.rdMolDescriptors import CalcMolFormula
 from random import choice as rnd
 import random
-from MoleculeDifferenceViewer import view_difference
 from copy import deepcopy
 import subprocess
 import ast
@@ -14,7 +13,7 @@ import pandas as pd
 import re
 from math import log10
 import os
-from gt4sd.properties import PropertyPredictorRegistry
+# from gt4sd.properties import PropertyPredictorRegistry
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
@@ -37,6 +36,11 @@ import json
 import fnmatch
 import math
 import six
+from rdkit import Chem
+from rdkit.Chem import Descriptors
+import pandas as pd
+from xgboost import XGBRegressor
+import joblib
 
 def MolCheckandPlot(StartingMoleculeUnedited, StartingMolecule, showdiff, Verbose=False):
     
@@ -922,11 +926,11 @@ def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondType
 
     elif Mutation == 'Glycolate':
         InsertStyle = rnd(['Within', 'Egde'])
-        result = Glycolate(StartingMolecule, rnd(Glycols), InsertStyle=InsertStyle, showdiff=showdiff)
+        result = Glycolate(StartingMolecule, InsertStyle=InsertStyle, showdiff=showdiff)
 
     elif Mutation == 'Esterify':
         InsertStyle = rnd(['Within', 'Egde'])
-        result = Esterify(StartingMolecule, rnd(Napthalenes), InsertStyle=InsertStyle, showdiff=showdiff)
+        result = Esterify(StartingMolecule, InsertStyle=InsertStyle, showdiff=showdiff)
     
     elif Mutation == 'RemoveFragment':
         result = RemoveFragment(StartingMolecule, BondTypes)
@@ -1335,7 +1339,15 @@ variable     ndens equal count(all)/vol
 print        "Average viscosity: ${{visc}} [Pa.s] @ $T K, ${{ndens}} atoms/A^3"
 
 """)
-        
+
+def limit_oxygen_atoms(molecule, max_oxygen_count):
+    # Count the number of oxygen atoms in the molecule
+    oxygen_count = sum(1 for atom in molecule.GetAtoms() if atom.GetSymbol() == "O")
+    
+    # Check if the count is within the limit
+    return oxygen_count <= max_oxygen_count
+
+
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
 
     try:
@@ -1350,6 +1362,10 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
         # Limit number of heavy atoms in generated candidates
         if NumHeavyAtoms > MaxNumHeavyAtoms:
             print('Molecule has too many heavy atoms')
+            MutMol = None
+
+        if limit_oxygen_atoms(result[0], max_oxygen_count=10):
+            print('Molecule has too many Oxygens')
             MutMol = None
         
         # Check if molecule is too short
@@ -2377,3 +2393,194 @@ def Glycolate(StartingMolecule, InsertStyle, showdiff=True, Verbose=False):
       
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
+def Dens40ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Density_40C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Density_40C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Density_40C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def Dens100ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Density_100C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Density_100C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Density_100C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def Visc40ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Viscosity_40C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Viscoity_40C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Viscosity_40C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def Visc100ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Viscosity_100C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Viscoity_100C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Viscosity_100C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def HeatCapacity100ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Heat_Capacity_100C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Heat_Capacity_100C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Heat_Capacity_100C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def HeatCapacity40ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Heat_Capacity_40C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Heat_Capacity_40C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Heat_Capacity_40C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def ThermalConductivity40ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Thermal_Conductivity_40C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Thermal_Conductivity_40C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Thermal_Conductivity_40C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
+
+def ThermalConductivity100ML(SMILES):
+    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Thermal_Conductivity_100C_Train_Descriptors.csv'
+    train_data = pd.read_csv(descriptor_file_path)
+    target_column = "Thermal_Conductivity_100C"  # Replace with the correct target column name
+    X = train_data.drop(columns=[target_column, 'SMILES'])
+    y = train_data[target_column]
+
+    mol = Chem.MolFromSmiles(SMILES)
+
+    # Calculate descriptors
+    descriptor_dict = {}
+    for desc_name, desc_func in Descriptors.descList:
+        try:
+            descriptor_dict[desc_name] = desc_func(mol)
+        except Exception as e:
+            descriptor_dict[desc_name] = None  # Handle calculation errors
+
+    input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
+
+    model = joblib.load('retrained_xgboost_model_Thermal_Conductivity_100C.joblib')
+    prediction = model.predict(input_data)
+
+    return prediction
