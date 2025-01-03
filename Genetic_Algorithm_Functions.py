@@ -13,7 +13,7 @@ import pandas as pd
 import re
 from math import log10
 import os
-# from gt4sd.properties import PropertyPredictorRegistry
+from gt4sd.properties import PropertyPredictorRegistry
 from rdkit import DataStructs
 from rdkit.Chem import rdFingerprintGenerator
 import numpy as np
@@ -747,8 +747,12 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
         if len(RemoveAtomNeigbors) == 1:
             StartingMolecule.RemoveAtom(RemoveAtomIdx)
         elif len(RemoveAtomNeigbors) == 2:
-            StartingMolecule.RemoveAtom(RemoveAtomIdx)
-            StartingMolecule.AddBond(RemoveAtomNeigbors[0].GetIdx(), RemoveAtomNeigbors[1].GetIdx(), rnd(BondTypes))
+            try:
+                StartingMolecule.RemoveAtom(RemoveAtomIdx)
+                StartingMolecule.AddBond(RemoveAtomNeigbors[0].GetIdx(), RemoveAtomNeigbors[1].GetIdx(), rnd(BondTypes))
+            except:
+                print('Error adding bond between atoms in Remove Atom function, bond may already exist')
+                Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None                
         else:
             print('Removed atom has illegal number of neighbors')
             Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
@@ -773,7 +777,6 @@ def RemoveAtom(StartingMolecule, BondTypes, fromAromatic=False, showdiff=True):
 
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
-#Change so that we can have at most 1 benzene molecule
 def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', showdiff=False, Verbose=False):
     """
     Function to insert an aromatic atom into a starting molecule
@@ -901,7 +904,7 @@ def InsertAromatic(StartingMolecule, AromaticMolecule, InsertStyle='Within', sho
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
 def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondTypes,
-           Atoms, showdiff, Fragments, Napthalenes, Glycols):
+           Atoms, showdiff, Fragments, Napthalenes, Mols):
     
     print(f'Mutation being performed: {Mutation}')
     if Mutation == 'AddAtom':
@@ -935,6 +938,10 @@ def Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, BondType
     elif Mutation == 'RemoveFragment':
         result = RemoveFragment(StartingMolecule, BondTypes)
 
+    elif Mutation == 'ReplaceCandidate':
+        result = ReplaceCandidate(Mols, BondTypes, AtomicNumbers, Atoms, Fragments,
+                                  Napthalenes, AromaticMolecule, showdiff)
+
     else:
         InsertStyle = rnd(['Within', 'Egde'])
         result = InsertAromatic(StartingMolecule, AromaticMolecule, showdiff=showdiff, InsertStyle=InsertStyle)
@@ -960,7 +967,6 @@ def CheckSubstruct(MutMol):
     else:
         return False
 
-# Function to run a command from a python script
 def runcmd(cmd, verbose = False, *args, **kwargs):
     #bascially allows python to run a bash command, and the code makes sure 
     #the error of the subproceess is communicated if it fails
@@ -1345,8 +1351,7 @@ def limit_oxygen_atoms(molecule, max_oxygen_count):
     oxygen_count = sum(1 for atom in molecule.GetAtoms() if atom.GetSymbol() == "O")
     
     # Check if the count is within the limit
-    return oxygen_count <= max_oxygen_count
-
+    return oxygen_count >= max_oxygen_count
 
 def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms, MaxAromRings):
 
@@ -1354,6 +1359,19 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
         NumRings = result[0].GetRingInfo().NumRings()
     except:
         NumRings = 0
+
+    try:
+        ring_info = result[0].GetRingInfo()
+        atom_rings = ring_info.AtomRings()
+        # Check if any ring exceeds the max_ring_size
+        for ring in atom_rings:
+            print(len(ring))
+            if len(ring) > 6:
+                print('Molecule has large rring')
+                MutMol = None
+                return MutMol     
+    except:
+        pass
 
     if result[0]!= None:
         #Get number of heavy atoms in mutated molecule
@@ -1395,6 +1413,7 @@ def GenMolChecks(result, GenerationMolecules, MaxNumHeavyAtoms, MinNumHeavyAtoms
             print('Too many bridged aromatic rings')
             MutMol = None
         
+        
         else:
             MutMol = result[0]
 
@@ -1426,13 +1445,13 @@ def GetKVisc(DVisc, Dens):
     except:
         return None
 
-def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, Charge, MolMass, Predecessor):
+def DataUpdate(MoleculeDatabase, IDCounter, MutMolSMILES, MutMol, MutationList, HeavyAtoms, ID, MolMass, Predecessor):
     MoleculeDatabase.at[IDCounter, 'SMILES'] = MutMolSMILES
     MoleculeDatabase.at[IDCounter, 'MolObject'] = MutMol
     MoleculeDatabase.at[IDCounter, 'MutationList'] = MutationList
     MoleculeDatabase.at[IDCounter, 'HeavyAtoms'] = HeavyAtoms 
     MoleculeDatabase.at[IDCounter, 'ID'] = ID
-    MoleculeDatabase.at[IDCounter, 'Charge'] = Charge
+    # MoleculeDatabase.at[IDCounter, 'Charge'] = Charge
     MoleculeDatabase.at[IDCounter, 'MolMass'] = MolMass
     MoleculeDatabase.at[IDCounter, 'Predecessor'] = Predecessor
 
@@ -1474,7 +1493,7 @@ def GetDVI(DVisc40, DVisc100):
     try:
         S = (-log10( (log10(DVisc40) + 1.2) / (log10(DVisc100) + 1.2) )) / (log10(175/235))
         DVI = 220 - (7*(10**S))
-        return DVI
+        return max(0, DVI)
     except:
         return 0
 
@@ -1527,7 +1546,6 @@ def plotmol(mol):
     img = Draw.MolsToGridImage([mol], subImgSize=(800, 800))
     img.show()
 
-# Add indexes to molecule for visualisation
 def mol_with_atom_index(mol):
 
     for atom in mol.GetAtoms():
@@ -1730,7 +1748,6 @@ def green_kubo(timestep, Pxy, Pxz, Pyz, volume, kBT):
 
     return avg_acf, viscosity
 
-# Viscosity from Einstein relation
 def einstein(timestep, Pxy, Pxz, Pyz, volume, kBT, Time):
     '''
     Calculate the viscosity from the Einstein relation 
@@ -2024,7 +2041,6 @@ def Napthalenate(StartingMolecule, Napthalene, InsertStyle, showdiff=True, Verbo
             if Verbose:
                 print('Starting molecule has rings, abandoning mutations')
             Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES = None, None, None
-            sys.exit()
 
         else:
             # Add fragment to Mol object of starting molecule
@@ -2394,7 +2410,7 @@ def Glycolate(StartingMolecule, InsertStyle, showdiff=True, Verbose=False):
     return Mut_Mol, Mut_Mol_Sanitized, MutMolSMILES, StartingMoleculeUnedited
 
 def Dens40ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Density_40C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Density_40C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Density_40C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2412,13 +2428,13 @@ def Dens40ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Density_40C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Density_40C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def Dens100ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Density_100C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Density_100C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Density_100C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2436,15 +2452,15 @@ def Dens100ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Density_100C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Density_100C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def Visc40ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Viscosity_40C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Viscosity_40C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
-    target_column = "Viscoity_40C"  # Replace with the correct target column name
+    target_column = "Viscosity_40C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
     y = train_data[target_column]
 
@@ -2460,15 +2476,15 @@ def Visc40ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Viscosity_40C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Viscosity_40C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def Visc100ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Viscosity_100C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Viscosity_100C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
-    target_column = "Viscoity_100C"  # Replace with the correct target column name
+    target_column = "Viscosity_100C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
     y = train_data[target_column]
 
@@ -2484,13 +2500,13 @@ def Visc100ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Viscosity_100C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Viscosity_100C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def HeatCapacity100ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Heat_Capacity_100C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Heat_Capacity_100C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Heat_Capacity_100C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2508,13 +2524,13 @@ def HeatCapacity100ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Heat_Capacity_100C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Heat_Capacity_100C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def HeatCapacity40ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Heat_Capacity_40C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Heat_Capacity_40C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Heat_Capacity_40C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2532,13 +2548,13 @@ def HeatCapacity40ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Heat_Capacity_40C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Heat_Capacity_40C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def ThermalConductivity40ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Thermal_Conductivity_40C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Thermal_Conductivity_40C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Thermal_Conductivity_40C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2556,13 +2572,13 @@ def ThermalConductivity40ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Thermal_Conductivity_40C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Thermal_Conductivity_40C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
 
 def ThermalConductivity100ML(SMILES):
-    descriptor_file_path = 'C:/Users/eeo21/Desktop/Datasets/Thermal_Conductivity_100C_Train_Descriptors.csv'
+    descriptor_file_path = '/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/Thermal_Conductivity_100C_Train_Descriptors.csv'
     train_data = pd.read_csv(descriptor_file_path)
     target_column = "Thermal_Conductivity_100C"  # Replace with the correct target column name
     X = train_data.drop(columns=[target_column, 'SMILES'])
@@ -2580,7 +2596,33 @@ def ThermalConductivity100ML(SMILES):
 
     input_data = pd.DataFrame([descriptor_dict], columns=X.columns)
 
-    model = joblib.load('retrained_xgboost_model_Thermal_Conductivity_100C.joblib')
+    model = joblib.load('/rds/general/user/eeo21/home/HIGH_THROUGHPUT_STUDIES/MLForTribology/GeneticAlgoMLRun/ModelsandDatasets/retrained_xgboost_model_Thermal_Conductivity_100C.joblib')
     prediction = model.predict(input_data)
 
-    return prediction
+    return prediction[0]
+
+def count_c_and_o(string):
+    count_C = string.count('C')
+    count_o = string.count('O')
+    count_c = string.count('c')
+    Atom_count = count_C + count_o + count_c
+    return Atom_count
+
+def ReplaceCandidate(Mols, BondTypes, AtomicNumbers, Atoms, fragments,
+                        Napthalenes, AromaticMolecule, showdiff,
+                        Mutations = ['AddAtom', 'ReplaceAtom', 'ReplaceBond', 'RemoveAtom', 'AddFragment', 
+                                     'RemoveFragment', 'Napthalenate', 'Esterify', 'Glycolate']):
+    
+    AromaticMolecule = fragments[-1]
+    Mutation = rnd(Mutations)
+
+    print('Attempting to replace candidate')
+
+    StartingMolecule = rnd(Mols) #Select starting molecule
+
+    # Perform mutation 
+    result = Mutate(StartingMolecule, Mutation, AromaticMolecule, AtomicNumbers, 
+                        BondTypes, Atoms, showdiff, Fragments=fragments, Napthalenes=Napthalenes, Mols=Mols)
+    
+    return result
+
